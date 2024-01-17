@@ -1,6 +1,14 @@
 [project]
 name = "llm-ollama"
 version = "0.1.0"
+authors = [{ name = "Sergey Alexandrov" }]
+license = { text = "Apache-2.0" }
+classifiers = ["License :: OSI Approved :: Apache Software License"]
+dependencies = ["llm"]
+requires-python = ">3.11"
+
+[project.urls]
+Homepage = "https://github.com/taketwo/llm-ollama"
 
 [project.entry-points.llm]
 ollama = "llm_ollama"
