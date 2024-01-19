@@ -1,14 +1,37 @@
 import json
 from typing import Optional
 
+import click
 import httpx
 import llm
 from pydantic import Field
 
 
+def get_models():
+    with httpx.Client() as client:
+        api_response = client.get("http://localhost:11434/api/tags")
+        api_response.raise_for_status()
+        models = api_response.json()["models"]
+        return models
+
+
+@llm.hookimpl
+def register_commands(cli):
+    @cli.group(name="ollama")
+    def ollama():
+        "Commands for working with models hosted on Ollama"
+
+    @ollama.command(name="list-models")
+    def list_models():
+        """List models that are available locally on Ollama server."""
+        for model in get_models():
+            click.echo(model["name"])
+
+
 @llm.hookimpl
 def register_models(register):
-    register(Ollama("llama2"))
+    for model in get_models():
+        register(Ollama(model["name"]))
 
 
 class Ollama(llm.Model):
