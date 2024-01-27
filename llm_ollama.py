@@ -1,36 +1,27 @@
-import json
 from typing import Optional
 
 import click
-import httpx
 import llm
+import ollama
 from pydantic import Field
-
-
-def get_models():
-    with httpx.Client() as client:
-        api_response = client.get("http://localhost:11434/api/tags")
-        api_response.raise_for_status()
-        models = api_response.json()["models"]
-        return models
 
 
 @llm.hookimpl
 def register_commands(cli):
     @cli.group(name="ollama")
-    def ollama():
+    def ollama_group():
         "Commands for working with models hosted on Ollama"
 
-    @ollama.command(name="list-models")
+    @ollama_group.command(name="list-models")
     def list_models():
         """List models that are available locally on Ollama server."""
-        for model in get_models():
+        for model in ollama.list()["models"]:
             click.echo(model["name"])
 
 
 @llm.hookimpl
 def register_models(register):
-    for model in get_models():
+    for model in ollama.list()["models"]:
         register(Ollama(model["name"]))
 
 
@@ -66,53 +57,26 @@ class Ollama(llm.Model):
     ):
         messages = self.build_messages(prompt, conversation)
         response._prompt_json = {"messages": messages}
-        body = {
-            "model": self.model_id,
-            "messages": messages,
-            "options": {},
-            "stream": False,
-        }
+        options = {}
         if prompt.options.temperature:
-            body["options"]["temperature"] = prompt.options.temperature
+            options["temperature"] = prompt.options.temperature
 
         if stream:
-            body["stream"] = True
-            with httpx.Client() as client, client.stream(
-                method="POST",
-                url="http://localhost:11434/api/chat",
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                },
-                json=body,
-                timeout=None,
-            ) as r:
-                for line in r.iter_lines():
-                    try:
-                        response.response_json = json.loads(line)
-                        yield response.response_json["message"]["content"]
-                    except json.decoder.JSONDecodeError:
-                        raise llm.ModelError(
-                            "Failed to parse JSON returned by the server",
-                        )
-                    except KeyError:
-                        raise llm.ModelError(
-                            "JSON returned by the server does not have expected structure",
-                        )
+            response_stream = ollama.chat(
+                model=self.model_id,
+                messages=messages,
+                stream=True,
+                options=options,
+            )
+            for chunk in response_stream:
+                yield chunk["message"]["content"]
         else:
-            with httpx.Client() as client:
-                api_response = client.post(
-                    "http://localhost:11434/api/chat",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                    },
-                    json=body,
-                    timeout=None,
-                )
-                api_response.raise_for_status()
-                yield api_response.json()["message"]["content"]
-                response.response_json = api_response.json()
+            response.response_json = ollama.chat(
+                model=self.model_id,
+                messages=messages,
+                options=options,
+            )
+            yield response.response_json["message"]["content"]
 
     def build_messages(self, prompt, conversation):
         messages = []

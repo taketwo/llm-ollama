@@ -1,12 +1,12 @@
 [project]
 name = "llm-ollama"
 version = "0.1.0"
-description = "LLM plugin providing access to local Ollama models using HTTP API"
+description = "LLM plugin providing access to local Ollama models"
 readme = "README.md"
 authors = [{ name = "Sergey Alexandrov" }]
 license = { text = "Apache-2.0" }
 classifiers = ["License :: OSI Approved :: Apache Software License"]
-dependencies = ["llm", "httpx"]
+dependencies = ["llm", "ollama"]
 requires-python = ">=3.8"
 
 [project.urls]
