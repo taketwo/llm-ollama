@@ -1,4 +1,5 @@
-from typing import Optional
+from collections import defaultdict
+from typing import List, Optional, Tuple
 
 import click
 import llm
@@ -21,8 +22,14 @@ def register_commands(cli):
 
 @llm.hookimpl
 def register_models(register):
+    models = defaultdict(list)
     for model in ollama.list()["models"]:
-        register(Ollama(model["name"]))
+        models[model["digest"]].append(model["name"])
+        if model["name"].endswith(":latest"):
+            models[model["digest"]].append(model["name"][: -len(":latest")])
+    for names in models.values():
+        name, aliases = _pick_primary_name(names)
+        register(Ollama(name), aliases=aliases)
 
 
 class Ollama(llm.Model):
@@ -101,3 +108,32 @@ class Ollama(llm.Model):
             messages.append({"role": "system", "content": prompt.system})
         messages.append({"role": "user", "content": prompt.prompt})
         return messages
+
+
+def _pick_primary_name(names: List[str]) -> Tuple[str, List[str]]:
+    """Pick the primary model name from a list of names.
+
+    The picking algorithm prefers names with the most specific tag, e.g. "llama2:7b"
+    over "llama2:latest" over "llama2".
+
+    Parameters
+    ----------
+    names : list[str]
+        A non-empty list of model names.
+
+    Returns
+    -------
+    tuple[str, list[str, ...]]
+        The primary model name and a list with the secondary names.
+    """
+    if len(names) == 1:
+        return names[0], ()
+    sorted_names = sorted(
+        names,
+        key=lambda name: (
+            ":" not in name,
+            name.endswith(":latest"),
+            name,
+        ),
+    )
+    return sorted_names[0], tuple(sorted_names[1:])

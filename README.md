@@ -27,16 +27,43 @@ Assuming you have `llama2:latest` available, you can run a prompt using:
 llm -m llama2:latest 'How much is 2+2?'
 ```
 
+The plugin automatically creates a short alias for models that have `:latest` in the name, so the previous command is equivalent to running:
+
+```bash
+llm -m llama2 'How much is 2+2?'
+```
+
 To start an interactive chat session:
 
 ```bash
-llm chat -m llama2:latest
+llm chat -m llama2
 ```
 ```
 Chatting with llama2:latest
 Type 'exit' or 'quit' to exit
 Type '!multi' to enter multiple lines, then '!end' to finish
 >
+```
+
+## Model aliases
+
+The same Ollama model may be referred by several names with different tags. For example, in the following list, there is a single unique model with three different names:
+
+```bash
+ollama list
+NAME                    ID              SIZE    MODIFIED
+stable-code:3b          aa5ab8afb862    1.6 GB  9 hours ago
+stable-code:code        aa5ab8afb862    1.6 GB  9 seconds ago
+stable-code:latest      aa5ab8afb862    1.6 GB  14 seconds ago
+```
+
+In such cases, the plugin will register a single model and create additional aliases. Continuing the previous example, this is what LLM will have:
+
+```bash
+llm models
+...
+
+Ollama: stable-code:3b (aliases: stable-code:code, stable-code:latest, stable-code)
 ```
 
 ## Model options
