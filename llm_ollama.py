@@ -32,6 +32,11 @@ def register_models(register):
         register(Ollama(name), aliases=aliases)
 
 
+@llm.hookimpl
+def register_embedding_models(register):
+    register(OllamaEmbed())
+
+
 class Ollama(llm.Model):
     can_stream: bool = True
 
@@ -108,6 +113,14 @@ class Ollama(llm.Model):
             messages.append({"role": "system", "content": prompt.system})
         messages.append({"role": "user", "content": prompt.prompt})
         return messages
+
+
+class OllamaEmbed(llm.EmbeddingModel):
+    model_id = "codellama:7b"
+
+    def embed_batch(self, texts):
+        for text in texts:
+            yield ollama.embeddings(model=self.model_id, prompt=text)["embedding"]
 
 
 def _pick_primary_name(names: List[str]) -> Tuple[str, List[str]]:
