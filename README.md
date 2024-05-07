@@ -68,9 +68,12 @@ Ollama: stable-code:3b (aliases: stable-code:code, stable-code:latest, stable-co
 
 ## Model options
 
-All models accept the following options, using `-o name value` syntax:
+All models accept [Ollama modelfile parameters](https://github.com/ollama/ollama/blob/main/docs/modelfile.md#parameter) as options. Use the `-o name value` syntax to specify them, for example:
 
-- `-o temperature 0.8`: The temperature of the model. Increasing the temperature will make the model answer more creatively.
+- `-o temperature 0.8`: set the temperature of the model
+- `-o num_ctx 256000`: set the size of the context window used to generate the next token
+
+See the referenced page for the complete list with descriptions and default values.
 
 ## Development
 
