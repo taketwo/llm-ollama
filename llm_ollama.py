@@ -36,15 +36,70 @@ class Ollama(llm.Model):
     can_stream: bool = True
 
     class Options(llm.Options):
+        """
+        Parameters that can be set when the model is run by Ollama.
+
+        See: https://github.com/ollama/ollama/blob/main/docs/modelfile.md#parameter
+        """
+
+        mirostat: Optional[int] = Field(
+            default=None,
+            description=("Enable Mirostat sampling for controlling perplexity."),
+        )
+        mirostat_eta: Optional[float] = Field(
+            default=None,
+            description=(
+                "Influences how quickly the algorithm responds to feedback from the generated text."
+            ),
+        )
+        mirostat_tau: Optional[float] = Field(
+            default=None,
+            description=(
+                "Controls the balance between coherence and diversity of the output."
+            ),
+        )
+        num_ctx: Optional[int] = Field(
+            default=None,
+            description="The size of the context window used to generate the next token.",
+        )
         temperature: Optional[float] = Field(
+            default=None,
             description=(
                 "The temperature of the model. Increasing the temperature will make the model answer more creatively."
             ),
-            ge=0,
-            le=1,
-            default=0.8,
         )
-        # TODO: Implement more options
+        seed: Optional[int] = Field(
+            default=None,
+            description=(
+                "Sets the random number seed to use for generation. Setting this to a specific number will make the model generate the same text for the same prompt."
+            ),
+        )
+        stop: Optional[str] = Field(
+            default=None,
+            description=(
+                "Sets the stop sequences to use. When this pattern is encountered the LLM will stop generating text and return."
+            ),
+        )
+        tfs_z: Optional[float] = Field(
+            default=None,
+            description=(
+                "Tail free sampling is used to reduce the impact of less probable tokens from the output."
+            ),
+        )
+        num_predict: Optional[int] = Field(
+            default=None,
+            description=("Maximum number of tokens to predict when generating text."),
+        )
+        top_k: Optional[int] = Field(
+            default=None,
+            description=("Reduces the probability of generating nonsense."),
+        )
+        top_p: Optional[float] = Field(
+            default=None,
+            description=(
+                "Works together with top-k. A higher value (e.g., 0.95) will lead to more diverse text, while a lower value (e.g., 0.5) will generate more focused and conservative text."
+            ),
+        )
 
     def __init__(
         self,
@@ -63,10 +118,8 @@ class Ollama(llm.Model):
         conversation=None,
     ):
         messages = self.build_messages(prompt, conversation)
+        options = prompt.options.model_dump(exclude_none=True)
         response._prompt_json = {"messages": messages}
-        options = {}
-        if prompt.options.temperature:
-            options["temperature"] = prompt.options.temperature
 
         if stream:
             response_stream = ollama.chat(
