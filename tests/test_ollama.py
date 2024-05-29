@@ -1,5 +1,7 @@
 from unittest.mock import patch
 
+from httpx import ConnectError
+
 from llm import get_models_with_aliases
 from llm.plugins import pm
 
@@ -47,3 +49,9 @@ def test_registered_models(mock_ollama_list):
     for model, (name, aliases) in zip(registered_ollama_models, expected):
         assert model.model.model_id == name
         assert model.aliases == aliases
+
+
+@patch("llm_ollama.ollama.list")
+def test_registered_models_when_ollama_is_down(mock_ollama_list):
+    mock_ollama_list.side_effect = ConnectError("[Errno 111] Connection refused")
+    assert not any(isinstance(m.model, Ollama) for m in get_models_with_aliases())
