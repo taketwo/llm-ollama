@@ -16,14 +16,14 @@ def register_commands(cli):
     @ollama_group.command(name="list-models")
     def list_models():
         """List models that are available locally on Ollama server."""
-        for model in ollama.list()["models"]:
+        for model in _get_ollama_models():
             click.echo(model["name"])
 
 
 @llm.hookimpl
 def register_models(register):
     models = defaultdict(list)
-    for model in ollama.list()["models"]:
+    for model in _get_ollama_models():
         models[model["digest"]].append(model["name"])
         if model["name"].endswith(":latest"):
             models[model["digest"]].append(model["name"][: -len(":latest")])
@@ -178,6 +178,7 @@ def _pick_primary_name(names: List[str]) -> Tuple[str, List[str]]:
     -------
     tuple[str, list[str, ...]]
         The primary model name and a list with the secondary names.
+
     """
     if len(names) == 1:
         return names[0], ()
@@ -190,3 +191,19 @@ def _pick_primary_name(names: List[str]) -> Tuple[str, List[str]]:
         ),
     )
     return sorted_names[0], tuple(sorted_names[1:])
+
+
+def _get_ollama_models():
+    """Get a list of models available on Ollama.
+
+    Returns
+    -------
+    list[dict]
+        A list of models available on Ollama. If the Ollama server is down, an empty
+        list is returned.
+
+    """
+    try:
+        return ollama.list()["models"]
+    except:
+        return []
