@@ -16,21 +16,20 @@ def register_commands(cli):
     @ollama_group.command(name="list-models")
     def list_models():
         """List models that are available locally on Ollama server."""
-        for model in ollama.list()["models"]:
+        for model in models_list():
             click.echo(model["name"])
 
 
 @llm.hookimpl
 def register_models(register):
     models = defaultdict(list)
-    for model in ollama.list()["models"]:
+    for model in models_list()["models"]:
         models[model["digest"]].append(model["name"])
         if model["name"].endswith(":latest"):
             models[model["digest"]].append(model["name"][: -len(":latest")])
     for names in models.values():
         name, aliases = _pick_primary_name(names)
         register(Ollama(name), aliases=aliases)
-
 
 class Ollama(llm.Model):
     can_stream: bool = True
@@ -190,3 +189,11 @@ def _pick_primary_name(names: List[str]) -> Tuple[str, List[str]]:
         ),
     )
     return sorted_names[0], tuple(sorted_names[1:])
+
+def models_list():
+    try:
+        models = ollama.list()
+    except:
+        models = {"models": []}
+
+    return models
