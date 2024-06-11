@@ -129,7 +129,10 @@ class Ollama(llm.Model):
                 options=options,
             )
             for chunk in response_stream:
-                yield chunk["message"]["content"]
+                try:
+                    yield chunk["message"]["content"]
+                except KeyError:
+                    pass
         else:
             response.response_json = ollama.chat(
                 model=self.model_id,
