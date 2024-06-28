@@ -74,7 +74,7 @@ class Ollama(llm.Model):
                 "Sets the random number seed to use for generation. Setting this to a specific number will make the model generate the same text for the same prompt."
             ),
         )
-        stop: Optional[str] = Field(
+        stop: Optional[List[str]] = Field(
             default=None,
             description=(
                 "Sets the stop sequences to use. When this pattern is encountered the LLM will stop generating text and return."
