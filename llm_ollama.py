@@ -1,3 +1,4 @@
+import contextlib
 from collections import defaultdict
 from typing import List, Optional, Tuple
 
@@ -36,8 +37,7 @@ class Ollama(llm.Model):
     can_stream: bool = True
 
     class Options(llm.Options):
-        """
-        Parameters that can be set when the model is run by Ollama.
+        """Parameters that can be set when the model is run by Ollama.
 
         See: https://github.com/ollama/ollama/blob/main/docs/modelfile.md#parameter
         """
@@ -138,10 +138,8 @@ class Ollama(llm.Model):
                 **kwargs,
             )
             for chunk in response_stream:
-                try:
+                with contextlib.suppress(KeyError):
                     yield chunk["message"]["content"]
-                except KeyError:
-                    pass
         else:
             response.response_json = ollama.chat(
                 model=self.model_id,
@@ -165,7 +163,7 @@ class Ollama(llm.Model):
                 and prev_response.prompt.system != current_system
             ):
                 messages.append(
-                    {"role": "system", "content": prev_response.prompt.system}
+                    {"role": "system", "content": prev_response.prompt.system},
                 )
                 current_system = prev_response.prompt.system
             messages.append({"role": "user", "content": prev_response.prompt.prompt})
@@ -206,7 +204,7 @@ def _pick_primary_name(names: List[str]) -> Tuple[str, List[str]]:
     return sorted_names[0], tuple(sorted_names[1:])
 
 
-def _get_ollama_models():
+def _get_ollama_models() -> List[dict]:
     """Get a list of models available on Ollama.
 
     Returns
