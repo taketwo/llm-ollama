@@ -77,6 +77,10 @@ See the referenced page for the complete list with descriptions and default valu
 
 Additionally, the `-o json_object 1` option can be used to force the model to reply with a valid JSON object. Note that your prompt must mention JSON for this to work.
 
+## Ollama server address
+
+If your Ollama server is not hosted at the default `localhost:11434` address, you can use `OLLAMA_HOST` environment variable to point the plugin to it.
+
 ## Development
 
 To set up this plugin locally, first checkout the code. Then create a new virtual environment:
