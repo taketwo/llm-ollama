@@ -75,6 +75,8 @@ All models accept [Ollama modelfile parameters](https://github.com/ollama/ollama
 
 See the referenced page for the complete list with descriptions and default values.
 
+Additionally, the `-o json_object 1` option can be used to force the model to reply with a valid JSON object. Note that your prompt must mention JSON for this to work.
+
 ## Development
 
 To set up this plugin locally, first checkout the code. Then create a new virtual environment:

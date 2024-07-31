@@ -100,6 +100,10 @@ class Ollama(llm.Model):
                 "Works together with top-k. A higher value (e.g., 0.95) will lead to more diverse text, while a lower value (e.g., 0.5) will generate more focused and conservative text."
             ),
         )
+        json_object: Optional[bool] = Field(
+            default=None,
+            description="Output a valid JSON object {...}. Prompt must mention JSON.",
+        )
 
     def __init__(
         self,
@@ -118,8 +122,12 @@ class Ollama(llm.Model):
         conversation=None,
     ):
         messages = self.build_messages(prompt, conversation)
-        options = prompt.options.model_dump(exclude_none=True)
         response._prompt_json = {"messages": messages}
+        options = prompt.options.model_dump(exclude_none=True)
+        json_object = options.pop("json_object", None)
+        kwargs = {}
+        if json_object:
+            kwargs["format"] = "json"
 
         if stream:
             response_stream = ollama.chat(
@@ -127,6 +135,7 @@ class Ollama(llm.Model):
                 messages=messages,
                 stream=True,
                 options=options,
+                **kwargs,
             )
             for chunk in response_stream:
                 try:
@@ -138,6 +147,7 @@ class Ollama(llm.Model):
                 model=self.model_id,
                 messages=messages,
                 options=options,
+                **kwargs,
             )
             yield response.response_json["message"]["content"]
 
