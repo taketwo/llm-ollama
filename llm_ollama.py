@@ -35,6 +35,12 @@ def register_models(register):
 
 class Ollama(llm.Model):
     can_stream: bool = True
+    attachment_types = {
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/gif",
+    }
 
     class Options(llm.Options):
         """Parameters that can be set when the model is run by Ollama.
@@ -154,8 +160,21 @@ class Ollama(llm.Model):
         if not conversation:
             if prompt.system:
                 messages.append({"role": "system", "content": prompt.system})
-            messages.append({"role": "user", "content": prompt.prompt})
+            if prompt.attachments:
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": prompt.prompt,
+                        "images": [
+                            attachment.base64_content()
+                            for attachment in prompt.attachments
+                        ],
+                    }
+                )
+            else:
+                messages.append({"role": "user", "content": prompt.prompt})
             return messages
+
         current_system = None
         for prev_response in conversation.responses:
             if (
@@ -166,7 +185,21 @@ class Ollama(llm.Model):
                     {"role": "system", "content": prev_response.prompt.system},
                 )
                 current_system = prev_response.prompt.system
-            messages.append({"role": "user", "content": prev_response.prompt.prompt})
+            if prev_response.attachments:
+                messages.append(
+                    {"role": "user", "content": prev_response.prompt.prompt}
+                )
+            else:
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": prev_response.prompt.prompt,
+                        "images": [
+                            attachment.base64_content()
+                            for attachment in prev_response.attachments
+                        ],
+                    }
+                )
             messages.append({"role": "assistant", "content": prev_response.text()})
         if prompt.system and prompt.system != current_system:
             messages.append({"role": "system", "content": prompt.system})
