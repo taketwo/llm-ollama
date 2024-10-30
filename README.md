@@ -45,6 +45,17 @@ Type '!multi' to enter multiple lines, then '!end' to finish
 >
 ```
 
+## Vision capability
+
+llm-ollama now support for attachments, allowing multi-modal models to accept images. To use `llava`  
+
+```bash
+llm -m llava "Describe this image" -a ~/latest.png
+```
+
+The `-a` option stands for `--attachment`. Attachments can be specified as URLs, as paths to files on disk.
+
+
 ## Model aliases
 
 The same Ollama model may be referred by several names with different tags. For example, in the following list, there is a single unique model with three different names:
