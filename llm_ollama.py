@@ -111,10 +111,7 @@ class Ollama(llm.Model):
             description="Output a valid JSON object {...}. Prompt must mention JSON.",
         )
 
-    def __init__(
-        self,
-        model_id: str,
-    ) -> None:
+    def __init__(self, model_id: str,) -> None:
         self.model_id = model_id
 
     def __str__(self) -> str:
@@ -148,10 +145,7 @@ class Ollama(llm.Model):
                     yield chunk["message"]["content"]
         else:
             response.response_json = ollama.chat(
-                model=self.model_id,
-                messages=messages,
-                options=options,
-                **kwargs,
+                model=self.model_id, messages=messages, options=options, **kwargs,
             )
             yield response.response_json["message"]["content"]
 
@@ -187,10 +181,6 @@ class Ollama(llm.Model):
                 current_system = prev_response.prompt.system
             if prev_response.attachments:
                 messages.append(
-                    {"role": "user", "content": prev_response.prompt.prompt}
-                )
-            else:
-                messages.append(
                     {
                         "role": "user",
                         "content": prev_response.prompt.prompt,
@@ -200,6 +190,11 @@ class Ollama(llm.Model):
                         ],
                     }
                 )
+            else:
+                messages.append(
+                    {"role": "user", "content": prev_response.prompt.prompt}
+                )
+
             messages.append({"role": "assistant", "content": prev_response.text()})
         if prompt.system and prompt.system != current_system:
             messages.append({"role": "system", "content": prompt.system})
@@ -227,12 +222,7 @@ def _pick_primary_name(names: List[str]) -> Tuple[str, List[str]]:
     if len(names) == 1:
         return names[0], ()
     sorted_names = sorted(
-        names,
-        key=lambda name: (
-            ":" not in name,
-            name.endswith(":latest"),
-            name,
-        ),
+        names, key=lambda name: (":" not in name, name.endswith(":latest"), name,),
     )
     return sorted_names[0], tuple(sorted_names[1:])
 
