@@ -30,7 +30,10 @@ def register_models(register):
             models[model["digest"]].append(model["name"][: -len(":latest")])
     for names in models.values():
         name, aliases = _pick_primary_name(names)
+        if not _ollama_model_capability_completion(name):
+            continue
         register(Ollama(name), aliases=aliases)
+
 
 @llm.hookimpl
 def register_embedding_models(register):
@@ -201,6 +204,7 @@ class Ollama(llm.Model):
         messages.append({"role": "user", "content": prompt.prompt})
         return messages
 
+
 class OllamaEmbed(llm.EmbeddingModel):
     supports_text = True
     supports_binary = False
@@ -217,7 +221,7 @@ class OllamaEmbed(llm.EmbeddingModel):
         result = ollama.embed(
             model=self.model_id,
             input=items,
-            truncate=False, # FIXME: will error if content is too long
+            truncate=False,  # FIXME: will error if content is too long
             keep_alive=600,
         )
         yield from result["embeddings"]
@@ -267,3 +271,26 @@ def _get_ollama_models() -> List[dict]:
         return ollama.list()["models"]
     except:
         return []
+
+
+def _ollama_model_capability_completion(model: str) -> bool:
+    """Check if a model is capable of completion.
+    This is a indicator for if a model can be used for chat or if its an embedding only model.
+
+    Parameters
+    ----------
+    model : str
+        The model name.
+
+    Returns
+    -------
+    bool
+        True if the model is capable of completion, False otherwise.
+    """
+
+    model_data = ollama.show(model)
+
+    model_info = model_data["model_info"]
+    model_arch = model_info["general.architecture"]
+
+    return f"{model_arch}.pooling_type" not in model_info
