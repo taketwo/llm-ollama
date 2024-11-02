@@ -32,6 +32,17 @@ def register_models(register):
         name, aliases = _pick_primary_name(names)
         register(Ollama(name), aliases=aliases)
 
+@llm.hookimpl
+def register_embedding_models(register):
+    models = defaultdict(list)
+    for model in _get_ollama_models():
+        models[model["digest"]].append(model["name"])
+        if model["name"].endswith(":latest"):
+            models[model["digest"]].append(model["name"][: -len(":latest")])
+    for names in models.values():
+        name, aliases = _pick_primary_name(names)
+        register(OllamaEmbed(name), aliases=aliases)
+
 
 class Ollama(llm.Model):
     can_stream: bool = True
@@ -189,6 +200,27 @@ class Ollama(llm.Model):
             messages.append({"role": "system", "content": prompt.system})
         messages.append({"role": "user", "content": prompt.prompt})
         return messages
+
+class OllamaEmbed(llm.EmbeddingModel):
+    supports_text = True
+    supports_binary = False
+    batch_size = 8
+
+    def __init__(self, model_id):
+        self.model_id = model_id
+
+    # NOTE: this is not used, but adding it anyways
+    def __str__(self) -> str:
+        return f"Ollama: {self.model_id}"
+
+    def embed_batch(self, items):
+        result = ollama.embed(
+            model=self.model_id,
+            input=items,
+            truncate=False, # FIXME: will error if content is too long
+            keep_alive=600,
+        )
+        yield from result["embeddings"]
 
 
 def _pick_primary_name(names: List[str]) -> Tuple[str, List[str]]:
