@@ -222,7 +222,6 @@ class OllamaEmbed(llm.EmbeddingModel):
             model=self.model_id,
             input=items,
             truncate=False,  # FIXME: will error if content is too long
-            keep_alive=600,
         )
         yield from result["embeddings"]
 
