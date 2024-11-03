@@ -275,7 +275,7 @@ def _get_ollama_models() -> List[dict]:
 def _ollama_model_capability_completion(model: str) -> bool:
     """Check if a model is capable of completion.
     This is a indicator for if a model can be used for chat or if its an embedding only model.
-    
+
     Source of this check is from Ollama server
     https://github.com/ollama/ollama/blob/8a9bb0d000ae8201445ef1a590d7136df0a16f8b/server/images.go#L100
     It works by checking if the model has a pooling_type key in the model_info,
@@ -293,11 +293,20 @@ def _ollama_model_capability_completion(model: str) -> bool:
     -------
     bool
         True if the model is capable of completion, False otherwise.
+        If the model name is not present in Ollama server, False is returned.
     """
 
-    model_data = ollama.show(model)
+    is_embedding_model = False
+    try:
+        model_data = ollama.show(model)
 
-    model_info = model_data["model_info"]
-    model_arch = model_info["general.architecture"]
+        model_info = model_data["model_info"]
+        model_arch = model_info["general.architecture"]
 
-    return f"{model_arch}.pooling_type" not in model_info
+        is_embedding_model = f"{model_arch}.pooling_type" in model_info
+    except ollama.ResponseError:
+        # if ollama.show fails, model name is not present in Ollama server, return False
+        return False
+    # except ConnectionError:
+
+    return not is_embedding_model
