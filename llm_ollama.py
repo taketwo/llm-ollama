@@ -278,9 +278,11 @@ def _ollama_model_capability_completion(model: str) -> bool:
     
     Source of this check is from Ollama server
     https://github.com/ollama/ollama/blob/8a9bb0d000ae8201445ef1a590d7136df0a16f8b/server/images.go#L100
-    It works by checking if the model has a pooling_type key in the model_info
-    it is saved 'model_info' as '{model_architecture}.pooling_type'
-    model_architecture is saved in the 'model_info' under 'general.architecture'
+    It works by checking if the model has a pooling_type key in the model_info,
+    making the model an embed only model, incapable of completion.
+    pooling_type is found in 'model_info' as '{model_architecture}.pooling_type'
+    where model_architecture is saved in the 'model_info' under 'general.architecture'.
+    note: from what I found, if it is present it is set to '1', but this is not checked in the reference code.
 
     Parameters
     ----------
