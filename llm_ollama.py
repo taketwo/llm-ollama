@@ -216,7 +216,7 @@ class OllamaEmbed(llm.EmbeddingModel):
 
         # NOTE: truncate the input to fit in the model's context length
         #       if set to False, the call will error if the input is too long
-        self.truncate = os.getenv("OLLAMA_EMBED_TRUNCATE", True)
+        self.truncate = bool(os.getenv("OLLAMA_EMBED_TRUNCATE", True))
 
     # NOTE: this is not used, but adding it anyways
     def __str__(self) -> str:
