@@ -1,3 +1,4 @@
+import os
 import contextlib
 from collections import defaultdict
 from typing import List, Optional, Tuple
@@ -213,15 +214,20 @@ class OllamaEmbed(llm.EmbeddingModel):
     def __init__(self, model_id):
         self.model_id = model_id
 
+        # NOTE: truncate the input to fit in the model's context length
+        #       if set to False, the call will error if the input is too long
+        self.truncate = os.getenv("OLLAMA_EMBED_TRUNCATE", True)
+
     # NOTE: this is not used, but adding it anyways
     def __str__(self) -> str:
         return f"Ollama: {self.model_id}"
 
     def embed_batch(self, items):
+
         result = ollama.embed(
             model=self.model_id,
             input=items,
-            truncate=False,  # FIXME: will error if content is too long
+            truncate=self.truncate,
         )
         yield from result["embeddings"]
 
