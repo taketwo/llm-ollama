@@ -6,7 +6,7 @@ from typing import List, Optional, Tuple
 import click
 import llm
 import ollama
-from pydantic import Field
+from pydantic import Field, TypeAdapter, ValidationError
 
 
 @llm.hookimpl
@@ -216,7 +216,12 @@ class OllamaEmbed(llm.EmbeddingModel):
 
         # NOTE: truncate the input to fit in the model's context length
         #       if set to False, the call will error if the input is too long
-        self.truncate = bool(os.getenv("OLLAMA_EMBED_TRUNCATE", True))
+        try:
+            self.truncate = TypeAdapter(bool).validate_python(
+                os.getenv("OLLAMA_EMBED_TRUNCATE", "True"),
+            )
+        except ValidationError:
+            self.truncate = True # default value
 
     # NOTE: this is not used, but adding it anyways
     def __str__(self) -> str:
