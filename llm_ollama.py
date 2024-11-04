@@ -1,4 +1,5 @@
 import os
+import warnings
 import contextlib
 from collections import defaultdict
 from typing import List, Optional, Tuple
@@ -221,6 +222,7 @@ class OllamaEmbed(llm.EmbeddingModel):
                 os.getenv("OLLAMA_EMBED_TRUNCATE", "True"),
             )
         except ValidationError:
+            warnings.warn("OLLAMA_EMBED_TRUNCATE is not a valid boolean value, defaulting to True")
             self.truncate = True # default value
 
     # NOTE: this is not used, but adding it anyways
