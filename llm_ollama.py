@@ -214,20 +214,19 @@ class OllamaEmbed(llm.EmbeddingModel):
 
     def __init__(self, model_id):
         self.model_id = model_id
+        self.truncate = True
 
-        # NOTE: truncate the input to fit in the model's context length
-        #       if set to False, the call will error if the input is too long
-        try:
-            self.truncate = TypeAdapter(bool).validate_python(
-                os.getenv("OLLAMA_EMBED_TRUNCATE", "True"),
-            )
-        except ValidationError:
-            warnings.warn(
-                "OLLAMA_EMBED_TRUNCATE is not a valid boolean value, defaulting to True"
-            )
-            self.truncate = True  # default value
+        # Read OLLAMA_EMBED_TRUNCATE environment variable to decide if truncation
+        # is enabled. If truncation is disabled and the input is too long, ollama.embed
+        # call will fail.
+        if (truncate := os.getenv("OLLAMA_EMBED_TRUNCATE")) is not None:
+            try:
+                self.truncate = TypeAdapter(bool).validate_python(truncate)
+            except ValidationError:
+                warnings.warn(
+                    f"OLLAMA_EMBED_TRUNCATE is set to '{truncate}', which is not a valid boolean value; defaulting to True",
+                )
 
-    # NOTE: this is not used, but adding it anyways
     def __str__(self) -> str:
         return f"Ollama: {self.model_id}"
 
