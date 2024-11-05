@@ -1,6 +1,6 @@
+import contextlib
 import os
 import warnings
-import contextlib
 from collections import defaultdict
 from typing import List, Optional, Tuple
 
@@ -222,15 +222,16 @@ class OllamaEmbed(llm.EmbeddingModel):
                 os.getenv("OLLAMA_EMBED_TRUNCATE", "True"),
             )
         except ValidationError:
-            warnings.warn("OLLAMA_EMBED_TRUNCATE is not a valid boolean value, defaulting to True")
-            self.truncate = True # default value
+            warnings.warn(
+                "OLLAMA_EMBED_TRUNCATE is not a valid boolean value, defaulting to True"
+            )
+            self.truncate = True  # default value
 
     # NOTE: this is not used, but adding it anyways
     def __str__(self) -> str:
         return f"Ollama: {self.model_id}"
 
     def embed_batch(self, items):
-
         result = ollama.embed(
             model=self.model_id,
             input=items,
@@ -287,7 +288,9 @@ def _get_ollama_models() -> List[dict]:
 
 def _ollama_model_capability_completion(model: str) -> bool:
     """Check if a model is capable of completion.
-    This is a indicator for if a model can be used for chat or if its an embedding only model.
+
+    This is a indicator for if a model can be used for chat or if its an embedding only
+    model.
 
     Source of this check is from Ollama server
     https://github.com/ollama/ollama/blob/8a9bb0d000ae8201445ef1a590d7136df0a16f8b/server/images.go#L100
@@ -295,7 +298,8 @@ def _ollama_model_capability_completion(model: str) -> bool:
     making the model an embed only model, incapable of completion.
     pooling_type is found in 'model_info' as '{model_architecture}.pooling_type'
     where model_architecture is saved in the 'model_info' under 'general.architecture'.
-    note: from what I found, if it is present it is set to '1', but this is not checked in the reference code.
+    note: from what I found, if it is present it is set to '1', but this is not checked
+    in the reference code.
 
     Parameters
     ----------
@@ -307,8 +311,8 @@ def _ollama_model_capability_completion(model: str) -> bool:
     bool
         True if the model is capable of completion, False otherwise.
         If the model name is not present in Ollama server, False is returned.
-    """
 
+    """
     is_embedding_model = False
     try:
         model_data = ollama.show(model)
