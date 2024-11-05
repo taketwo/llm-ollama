@@ -21,7 +21,10 @@ jobs:
           cache-dependency-path: setup.py
       - name: Install dependencies
         run: |
-          pip install -e '.[test]'
+          pip install -e '.[lint,test]'
+      - name: Check code formatting
+        run: |
+          black --check --diff .
       - name: Run tests
         run: |
           pytest

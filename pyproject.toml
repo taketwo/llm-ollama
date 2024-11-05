@@ -20,3 +20,4 @@ ollama = "llm_ollama"
 
 [project.optional-dependencies]
 test = ["pytest"]
+lint = ["black"]
