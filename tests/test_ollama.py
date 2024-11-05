@@ -4,10 +4,10 @@ import pytest
 
 from httpx import ConnectError
 
-from llm import get_models_with_aliases
+from llm import get_embedding_models_with_aliases, get_models_with_aliases
 from llm.plugins import pm
 
-from llm_ollama import Ollama
+from llm_ollama import Ollama, OllamaEmbed
 
 
 @pytest.fixture
@@ -75,6 +75,27 @@ def test_registered_chat_models(mock_ollama):
     )
     registered_ollama_models = sorted(
         [m for m in get_models_with_aliases() if isinstance(m.model, Ollama)],
+        key=lambda m: m.model.model_id,
+    )
+    assert len(registered_ollama_models) == len(expected)
+    for model, (name, aliases) in zip(registered_ollama_models, expected):
+        assert model.model.model_id == name
+        assert model.aliases == aliases
+
+
+def test_registered_embedding_models(mock_ollama):
+    expected = (
+        ("llama2:7b", ["llama2:latest", "llama2"]),
+        ("mxbai-embed-large:latest", ["mxbai-embed-large"]),
+        ("phi3:latest", ["phi3"]),
+        ("stable-code:3b", []),
+    )
+    registered_ollama_models = sorted(
+        [
+            m
+            for m in get_embedding_models_with_aliases()
+            if isinstance(m.model, OllamaEmbed)
+        ],
         key=lambda m: m.model.model_id,
     )
     assert len(registered_ollama_models) == len(expected)
