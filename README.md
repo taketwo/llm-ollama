@@ -19,7 +19,7 @@ llm install llm-ollama
 
 First, ensure that your Ollama server is running and that you have pulled some models. You can use `ollama list` to check what is locally available.
 
-The plugin will query the Ollama server for the list of models. You can use `llm ollama list-models` to see the list; it should be the same as output by `ollama list`. All these models will be automatically registered with LLM and made available for prompting and chatting.
+The plugin will query the Ollama server for the list of models. You can use `llm ollama list-models` to see the list; it should be the same as output by `ollama list`. All these models will be automatically registered with LLM and made available for prompting, chatting, and embedding.
 
 Assuming you have `llama2:latest` available, you can run a prompt using:
 
@@ -45,16 +45,23 @@ Type '!multi' to enter multiple lines, then '!end' to finish
 >
 ```
 
-## Vision capability
+### Image attachments
 
-llm-ollama now support for attachments, allowing multi-modal models to accept images. To use `llava`  
+Multi-modal Ollama models can accept image attachments using the [LLM attachments](https://llm.datasette.io/en/stable/usage.html#attachments) options:
 
 ```bash
-llm -m llava "Describe this image" -a ~/latest.png
+llm -m llava "Describe this image" -a https://static.simonwillison.net/static/2024/pelicans.jpg
 ```
 
-The `-a` option stands for `--attachment`. Attachments can be specified as URLs, as paths to files on disk.
+### Embeddings
 
+The plugin supports [LLM embeddings](https://llm.datasette.io/en/stable/embeddings/cli.html). Both regular and specialized embedding models (such as `mxbai-embed-large`) can be used:
+
+```bash
+llm embed -m mxbai-embed-large -i README.md
+```
+
+By default, the input will be truncated from the end to fit within the context length. This behavior can be changed by setting `OLLAMA_EMBED_TRUNCATE=no` environment variable. In such case, embedding operation will fail if context length is exceeded.
 
 ## Model aliases
 
