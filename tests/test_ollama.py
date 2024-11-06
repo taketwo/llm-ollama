@@ -104,6 +104,41 @@ def test_registered_embedding_models(mock_ollama):
         assert model.aliases == aliases
 
 
+@pytest.mark.parametrize(
+    ("envvar_value", "expected_truncate_value"),
+    [
+        (None, True),
+        ("True", True),
+        ("true", True),
+        ("yes", True),
+        ("y", True),
+        ("on", True),
+        ("False", False),
+        ("false", False),
+        ("no", False),
+        ("n", False),
+        ("off", False),
+    ],
+)
+@patch("llm_ollama.ollama.embed")
+def test_model_embed(
+    mock_ollama_embed,
+    envvar_value,
+    expected_truncate_value,
+    monkeypatch,
+):
+    expected = [0.1] * 1024
+    mock_ollama_embed.return_value = {"embeddings": [expected]}
+    if envvar_value is not None:
+        monkeypatch.setenv("OLLAMA_EMBED_TRUNCATE", envvar_value)
+    else:
+        monkeypatch.delenv("OLLAMA_EMBED_TRUNCATE", raising=False)
+    result = OllamaEmbed("mxbai-embed-large:latest").embed("string to embed")
+    assert result == expected
+    _, called_kwargs = mock_ollama_embed.call_args
+    assert called_kwargs.get("truncate") is expected_truncate_value
+
+
 @patch("llm_ollama.ollama.list")
 def test_registered_models_when_ollama_is_down(mock_ollama_list):
     mock_ollama_list.side_effect = ConnectError("[Errno 111] Connection refused")
