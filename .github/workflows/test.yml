@@ -24,7 +24,7 @@ jobs:
           pip install -e '.[lint,test]'
       - name: Check code formatting
         run: |
-          black --check --diff .
+          python -m black --check --diff .
       - name: Run tests
         run: |
           python -m pytest
