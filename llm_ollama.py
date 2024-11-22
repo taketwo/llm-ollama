@@ -194,7 +194,7 @@ class Ollama(llm.Model):
                 )
                 current_system = prev_response.prompt.system
             messages.append({"role": "user", "content": prev_response.prompt.prompt})
-            if prev_response.attachments:
+            if hasattr(prev_response, "attachments"):
                 messages[-1]["images"] = [
                     attachment.base64_content()
                     for attachment in prev_response.attachments
