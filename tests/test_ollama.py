@@ -12,43 +12,46 @@ from llm_ollama import Ollama, OllamaEmbed
 
 @pytest.fixture
 def mock_ollama():
-    with patch("llm_ollama.ollama.list") as mock_list, patch(
-        "llm_ollama.ollama.show",
-    ) as mock_show:
+    with (
+        patch("llm_ollama.ollama.list") as mock_list,
+        patch(
+            "llm_ollama.ollama.show",
+        ) as mock_show,
+    ):
         return_value = {
             "models": [
                 {
-                    "name": "stable-code:3b",
+                    "model": "stable-code:3b",
                     "digest": "aa5ab8afb86208e1c097028d63074f0142ce6079420ea6f68f219933361fd869",
-                    "model_info": {
+                    "modelinfo": {
                         "general.architecture": "stablelm",
                     },
                 },
                 {
-                    "name": "llama2:7b",
+                    "model": "llama2:7b",
                     "digest": "78e26419b4469263f75331927a00a0284ef6544c1975b826b15abdaef17bb962",
-                    "model_info": {
+                    "modelinfo": {
                         "general.architecture": "llama",
                     },
                 },
                 {
-                    "name": "llama2:latest",
+                    "model": "llama2:latest",
                     "digest": "78e26419b4469263f75331927a00a0284ef6544c1975b826b15abdaef17bb962",
-                    "model_info": {
+                    "modelinfo": {
                         "general.architecture": "llama",
                     },
                 },
                 {
-                    "name": "phi3:latest",
+                    "model": "phi3:latest",
                     "digest": "e2fd6321a5fe6bb3ac8a4e6f1cf04477fd2dea2924cf53237a995387e152ee9c",
-                    "model_info": {
+                    "modelinfo": {
                         "general.architecture": "phi3",
                     },
                 },
                 {
-                    "name": "mxbai-embed-large:latest",
+                    "model": "mxbai-embed-large:latest",
                     "digest": "468836162de7f81e041c43663fedbbba921dcea9b9fefea135685a39b2d83dd8",
-                    "model_info": {
+                    "modelinfo": {
                         "general.architecture": "bert",
                         "bert.pooling_type": 2,
                     },
@@ -57,7 +60,7 @@ def mock_ollama():
         }
         mock_list.return_value = return_value
         mock_show.side_effect = lambda name: next(
-            m for m in return_value["models"] if m["name"] == name
+            m for m in return_value["models"] if m["model"] == name
         )
         yield mock_list, mock_show
 

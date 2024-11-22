@@ -20,16 +20,17 @@ def register_commands(cli):
     def list_models():
         """List models that are available locally on Ollama server."""
         for model in _get_ollama_models():
-            click.echo(model["name"])
+            click.echo(model["model"])
 
 
 @llm.hookimpl
 def register_models(register):
     models = defaultdict(list)
     for model in _get_ollama_models():
-        models[model["digest"]].append(model["name"])
-        if model["name"].endswith(":latest"):
-            models[model["digest"]].append(model["name"][: -len(":latest")])
+        name, digest = model["model"], model["digest"]
+        models[digest].append(name)
+        if name.endswith(":latest"):
+            models[digest].append(name[: -len(":latest")])
     for names in models.values():
         name, aliases = _pick_primary_name(names)
         if not _ollama_model_capability_completion(name):
@@ -41,9 +42,9 @@ def register_models(register):
 def register_embedding_models(register):
     models = defaultdict(list)
     for model in _get_ollama_models():
-        models[model["digest"]].append(model["name"])
-        if model["name"].endswith(":latest"):
-            models[model["digest"]].append(model["name"][: -len(":latest")])
+        models[model["digest"]].append(model["model"])
+        if model["model"].endswith(":latest"):
+            models[model["digest"]].append(model["model"][: -len(":latest")])
     for names in models.values():
         name, aliases = _pick_primary_name(names)
         register(OllamaEmbed(name), aliases=aliases)
@@ -316,7 +317,7 @@ def _ollama_model_capability_completion(model: str) -> bool:
     try:
         model_data = ollama.show(model)
 
-        model_info = model_data["model_info"]
+        model_info = model_data["modelinfo"]
         model_arch = model_info["general.architecture"]
 
         is_embedding_model = f"{model_arch}.pooling_type" in model_info
