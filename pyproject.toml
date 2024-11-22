@@ -7,7 +7,7 @@ authors = [{ name = "Sergey Alexandrov" }]
 license = { text = "Apache-2.0" }
 classifiers = ["License :: OSI Approved :: Apache Software License"]
 dependencies = ["llm", "ollama", "pydantic>=2"]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 
 [project.urls]
 Homepage = "https://github.com/taketwo/llm-ollama"
