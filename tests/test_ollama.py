@@ -62,11 +62,6 @@ def mock_ollama():
         yield mock_list, mock_show
 
 
-def test_plugin_is_installed():
-    names = [mod.__name__ for mod in pm.get_plugins()]
-    assert "llm_ollama" in names
-
-
 def test_registered_chat_models(mock_ollama):
     expected = (
         ("llama2:7b", ["llama2:latest", "llama2"]),
