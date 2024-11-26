@@ -5,7 +5,7 @@ import pytest
 from httpx import ConnectError
 
 from llm import get_embedding_models_with_aliases, get_models_with_aliases
-from llm.plugins import pm
+from llm.plugins import load_plugins, pm
 
 from llm_ollama import Ollama, OllamaEmbed
 
@@ -63,6 +63,12 @@ def mock_ollama():
             m for m in return_value["models"] if m["model"] == name
         )
         yield mock_list, mock_show
+
+
+def test_plugin_is_installed():
+    load_plugins()
+    names = [mod.__name__ for mod in pm.get_plugins()]
+    assert "llm_ollama" in names
 
 
 def test_registered_chat_models(mock_ollama):
