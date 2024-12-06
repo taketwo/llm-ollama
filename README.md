@@ -63,6 +63,24 @@ llm embed -m mxbai-embed-large -i README.md
 
 By default, the input will be truncated from the end to fit within the context length. This behavior can be changed by setting `OLLAMA_EMBED_TRUNCATE=no` environment variable. In such case, embedding operation will fail if context length is exceeded.
 
+### Async Support
+
+The llm-ollama package now offers asynchronous versions of its supported models, designed for use with Python’s asyncio.
+
+To utilize an asynchronous model provided by Ollama, call the llm.get_async_model() function instead of llm.get_model().
+
+```python
+import asyncio, llm
+
+async def run():
+    model = llm.get_async_model("llama3.2:latest")
+    model = get_async_model("llama3.2:latest")
+    response = model.prompt("a short poem about a tea")
+    print(await response.text())
+
+asyncio.run(run())
+```
+
 ## Model aliases
 
 The same Ollama model may be referred by several names with different tags. For example, in the following list, there is a single unique model with three different names:
