@@ -75,7 +75,7 @@ import asyncio, llm
 async def run():
     model = llm.get_async_model("llama3.2:latest")
     model = get_async_model("llama3.2:latest")
-    response = model.prompt("a short poem about a tea")
+    response = model.prompt("a short poem about tea")
     print(await response.text())
 
 asyncio.run(run())

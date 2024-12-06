@@ -165,7 +165,7 @@ def test_registered_models_when_ollama_is_down(mock_ollama_list):
 async def test_actual_run():
     """Tests actual run. Needs llama3.2"""
     model = get_async_model("llama3.2:latest")
-    response = model.prompt("a short poem about a tea")
+    response = model.prompt("a short poem about tea")
     response_text = await response.text()
     assert len(response_text) > 0
 
