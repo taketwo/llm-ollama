@@ -1,13 +1,24 @@
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 
 import pytest
+import os
 
 from httpx import ConnectError
 
-from llm import get_embedding_models_with_aliases, get_models_with_aliases
+from llm import (
+    get_embedding_models_with_aliases,
+    get_models_with_aliases,
+    get_async_model,
+)
 from llm.plugins import load_plugins, pm
 
 from llm_ollama import Ollama, OllamaEmbed
+
+
+from ollama import AsyncClient
+
+
+IN_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") == "true"
 
 
 @pytest.fixture
@@ -147,3 +158,37 @@ def test_model_embed(
 def test_registered_models_when_ollama_is_down(mock_ollama_list):
     mock_ollama_list.side_effect = ConnectError("[Errno 111] Connection refused")
     assert not any(isinstance(m.model, Ollama) for m in get_models_with_aliases())
+
+
+@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
+@pytest.mark.asyncio
+async def test_actual_run():
+    """Tests actual run. Needs llama3.2"""
+    model = get_async_model("llama3.2:latest")
+    response = model.prompt("a short poem about a brick")
+    response_text = await response.text()
+    assert len(response_text) > 0
+
+
+@pytest.mark.asyncio
+async def test_actual_run(mock_ollama):
+    # Mock the asynchronous chat method to return an async iterable
+    async def mock_chat(*args, **kwargs):
+        messages = [
+            {"message": {"content": "Test response 1"}},
+            {"message": {"content": "Test response 2"}},
+        ]
+        for msg in messages:
+            yield msg
+
+    # Patch the ollama.AsyncClient.chat method
+    with patch("ollama.AsyncClient.chat", new_callable=AsyncMock) as mock_chat_method:
+        mock_chat_method.return_value = mock_chat()
+
+        # Instantiate the model and send a prompt
+        model = get_async_model("llama2:7b")
+        response = model.prompt("Dummy Prompt")
+        response_text = await response.text()
+
+        assert response_text == "Test response 1Test response 2"
+        mock_chat_method.assert_called_once()

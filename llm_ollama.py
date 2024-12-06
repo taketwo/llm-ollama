@@ -35,7 +35,7 @@ def register_models(register):
         name, aliases = _pick_primary_name(names)
         if not _ollama_model_capability_completion(name):
             continue
-        register(Ollama(name), aliases=aliases)
+        register(Ollama(name), AsyncOllama(name), aliases=aliases)
 
 
 @llm.hookimpl
@@ -50,7 +50,7 @@ def register_embedding_models(register):
         register(OllamaEmbed(name), aliases=aliases)
 
 
-class Ollama(llm.Model):
+class _SharedOllama:
     can_stream: bool = True
     attachment_types = {
         "image/png",
@@ -137,41 +137,6 @@ class Ollama(llm.Model):
     def __str__(self) -> str:
         return f"Ollama: {self.model_id}"
 
-    def execute(
-        self,
-        prompt: llm.Prompt,
-        stream: bool,
-        response: llm.Response,
-        conversation=None,
-    ):
-        messages = self.build_messages(prompt, conversation)
-        response._prompt_json = {"messages": messages}
-        options = prompt.options.model_dump(exclude_none=True)
-        json_object = options.pop("json_object", None)
-        kwargs = {}
-        if json_object:
-            kwargs["format"] = "json"
-
-        if stream:
-            response_stream = ollama.chat(
-                model=self.model_id,
-                messages=messages,
-                stream=True,
-                options=options,
-                **kwargs,
-            )
-            for chunk in response_stream:
-                with contextlib.suppress(KeyError):
-                    yield chunk["message"]["content"]
-        else:
-            response.response_json = ollama.chat(
-                model=self.model_id,
-                messages=messages,
-                options=options,
-                **kwargs,
-            )
-            yield response.response_json["message"]["content"]
-
     def build_messages(self, prompt, conversation):
         messages = []
         if not conversation:
@@ -206,6 +171,93 @@ class Ollama(llm.Model):
             messages.append({"role": "system", "content": prompt.system})
         messages.append({"role": "user", "content": prompt.prompt})
         return messages
+
+
+class Ollama(_SharedOllama, llm.Model):
+    def execute(
+        self,
+        prompt: llm.Prompt,
+        stream: bool,
+        response: llm.Response,
+        conversation=None,
+    ):
+        messages = self.build_messages(prompt, conversation)
+        response._prompt_json = {"messages": messages}
+        options = prompt.options.model_dump(exclude_none=True)
+        json_object = options.pop("json_object", None)
+        kwargs = {}
+        if json_object:
+            kwargs["format"] = "json"
+
+        if stream:
+            response_stream = ollama.Client().chat(
+                model=self.model_id,
+                messages=messages,
+                stream=True,
+                options=options,
+                **kwargs,
+            )
+            for chunk in response_stream:
+                with contextlib.suppress(KeyError):
+                    yield chunk["message"]["content"]
+        else:
+            response.response_json = ollama.Client().chat(
+                model=self.model_id,
+                messages=messages,
+                options=options,
+                **kwargs,
+            )
+            yield response.response_json["message"]["content"]
+
+
+class AsyncOllama(_SharedOllama, llm.AsyncModel):
+    async def execute(
+        self,
+        prompt: llm.Prompt,
+        stream: bool,
+        response: llm.Response,
+        conversation=None,
+    ):
+        """
+        Executes the Ollama model asynchronously.
+
+        Args:
+            prompt (llm.Prompt): The prompt for the model.
+            stream (bool): Whether to stream the response.
+            response (llm.Response): The response object to populate.
+            conversation (Optional): The conversation context.
+        """
+        messages = self.build_messages(prompt, conversation)
+        response._prompt_json = {"messages": messages}
+
+        options = prompt.options.model_dump(exclude_none=True)
+        json_object = options.pop("json_object", None)
+        kwargs = {}
+        if json_object:
+            kwargs["format"] = "json"
+
+        try:
+            if stream:
+                response_stream = await ollama.AsyncClient().chat(
+                    model=self.model_id,
+                    messages=messages,
+                    stream=True,
+                    options=options,
+                    **kwargs,
+                )
+                async for chunk in response_stream:
+                    with contextlib.suppress(KeyError):
+                        yield chunk["message"]["content"]
+            else:
+                response.response_json = await ollama.AsyncClient().chat(
+                    model=self.model_id,
+                    messages=messages,
+                    options=options,
+                    **kwargs,
+                )
+                yield response.response_json["message"]["content"]
+        except Exception as e:
+            raise RuntimeError(f"Async execution failed: {e}") from e
 
 
 class OllamaEmbed(llm.EmbeddingModel):

@@ -19,5 +19,5 @@ CI = "https://github.com/taketwo/llm-ollama/actions"
 ollama = "llm_ollama"
 
 [project.optional-dependencies]
-test = ["pytest"]
+test = ["pytest", "pytest-asyncio"]
 lint = ["black"]
