@@ -171,7 +171,7 @@ async def test_actual_run():
 
 
 @pytest.mark.asyncio
-async def test_actual_run(mock_ollama):
+async def test_async_ollama_call(mock_ollama):
     # Mock the asynchronous chat method to return an async iterable
     async def mock_chat(*args, **kwargs):
         messages = [
