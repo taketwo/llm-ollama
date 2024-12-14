@@ -5,7 +5,7 @@
 [![Tests](https://github.com/taketwo/llm-ollama/actions/workflows/test.yml/badge.svg)](https://github.com/taketwo/llm-ollama/actions/workflows/test.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/taketwo/llm-ollama/blob/main/LICENSE)
 
-[LLM](https://llm.datasette.io/) plugin providing access to models running on local [Ollama](https://ollama.ai) server.
+[LLM](https://llm.datasette.io/) plugin providing access to models running on a local or remote [Ollama](https://ollama.ai) server.
 
 ## Installation
 
@@ -78,6 +78,14 @@ async def run():
     print(await response.text())
 
 asyncio.run(run())
+```
+
+### Remote Ollama server
+
+If your Ollama server is remote ensure you define the `OLLAMA_HOST` environment variable, so it is used.
+
+```bash
+export OLLAMA_HOST=https://192.168.1.13:11434
 ```
 
 ## Model aliases

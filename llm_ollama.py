@@ -190,7 +190,7 @@ class Ollama(_SharedOllama, llm.Model):
             kwargs["format"] = "json"
 
         if stream:
-            response_stream = ollama.Client().chat(
+            response_stream = _client().chat(
                 model=self.model_id,
                 messages=messages,
                 stream=True,
@@ -201,7 +201,7 @@ class Ollama(_SharedOllama, llm.Model):
                 with contextlib.suppress(KeyError):
                     yield chunk["message"]["content"]
         else:
-            response.response_json = ollama.Client().chat(
+            response.response_json = _client().chat(
                 model=self.model_id,
                 messages=messages,
                 options=options,
@@ -238,7 +238,7 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
 
         try:
             if stream:
-                response_stream = await ollama.AsyncClient().chat(
+                response_stream = await _async_client().chat(
                     model=self.model_id,
                     messages=messages,
                     stream=True,
@@ -249,7 +249,7 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                     with contextlib.suppress(KeyError):
                         yield chunk["message"]["content"]
             else:
-                response.response_json = await ollama.AsyncClient().chat(
+                response.response_json = await _async_client().chat(
                     model=self.model_id,
                     messages=messages,
                     options=options,
@@ -284,7 +284,7 @@ class OllamaEmbed(llm.EmbeddingModel):
         return f"Ollama: {self.model_id}"
 
     def embed_batch(self, items):
-        result = ollama.embed(
+        result = _client().embed(
             model=self.model_id,
             input=items,
             truncate=self.truncate,
@@ -333,7 +333,7 @@ def _get_ollama_models() -> List[dict]:
 
     """
     try:
-        return ollama.list()["models"]
+        return _client().list()["models"]
     except:
         return []
 
@@ -367,7 +367,7 @@ def _ollama_model_capability_completion(model: str) -> bool:
     """
     is_embedding_model = False
     try:
-        model_data = ollama.show(model)
+        model_data = _client().show(model)
 
         model_info = model_data["modelinfo"]
         model_arch = model_info["general.architecture"]
@@ -379,3 +379,15 @@ def _ollama_model_capability_completion(model: str) -> bool:
     # except ConnectionError:
 
     return not is_embedding_model
+
+
+def _client() -> ollama.Client:
+    """Create the Ollama client"""
+    ollama_host = os.getenv("OLLAMA_HOST")
+    return ollama.Client(host=ollama_host)
+
+
+def _async_client() -> ollama.AsyncClient:
+    """Create the Ollama client"""
+    ollama_host = os.getenv("OLLAMA_HOST")
+    return ollama.AsyncClient(host=ollama_host)

@@ -12,7 +12,7 @@ from llm import (
 )
 from llm.plugins import load_plugins, pm
 
-from llm_ollama import Ollama, OllamaEmbed
+from llm_ollama import Ollama, OllamaEmbed, _client, _async_client
 
 
 from ollama import AsyncClient
@@ -158,6 +158,38 @@ def test_model_embed(
 def test_registered_models_when_ollama_is_down(mock_ollama_list):
     mock_ollama_list.side_effect = ConnectError("[Errno 111] Connection refused")
     assert not any(isinstance(m.model, Ollama) for m in get_models_with_aliases())
+
+
+@patch("llm_ollama.ollama.Client")
+def test_client_with_host(mock_client):
+    """Test client creation with OLLAMA_HOST environment variable set"""
+    with patch.dict("os.environ", {"OLLAMA_HOST": "http://custom-host:11434"}):
+        client = _client()
+        mock_client.assert_called_once_with(host="http://custom-host:11434")
+
+
+@patch("llm_ollama.ollama.Client")
+def test_client_without_host(mock_client):
+    """Test client creation without OLLAMA_HOST environment variable"""
+    with patch.dict("os.environ", clear=True):
+        client = _client()
+        mock_client.assert_called_once_with(host=None)
+
+
+@patch("llm_ollama.ollama.AsyncClient")
+def test_async_client_with_host(mock_async_client):
+    """Test async client creation with OLLAMA_HOST environment variable set"""
+    with patch.dict("os.environ", {"OLLAMA_HOST": "http://custom-host:11434"}):
+        client = _async_client()
+        mock_async_client.assert_called_once_with(host="http://custom-host:11434")
+
+
+@patch("llm_ollama.ollama.AsyncClient")
+def test_async_client_without_host(mock_async_client):
+    """Test async client creation without OLLAMA_HOST environment variable"""
+    with patch.dict("os.environ", clear=True):
+        client = _async_client()
+        mock_async_client.assert_called_once_with(host=None)
 
 
 @pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
