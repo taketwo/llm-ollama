@@ -5,7 +5,7 @@
 [![Tests](https://github.com/taketwo/llm-ollama/actions/workflows/test.yml/badge.svg)](https://github.com/taketwo/llm-ollama/actions/workflows/test.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/taketwo/llm-ollama/blob/main/LICENSE)
 
-[LLM](https://llm.datasette.io/) plugin providing access to models running on local [Ollama](https://ollama.ai) server.
+[LLM](https://llm.datasette.io/) plugin providing access to models running on an [Ollama](https://ollama.ai) server.
 
 ## Installation
 
@@ -114,7 +114,11 @@ Additionally, the `-o json_object 1` option can be used to force the model to re
 
 ## Ollama server address
 
-If your Ollama server is not hosted at the default `localhost:11434` address, you can use `OLLAMA_HOST` environment variable to point the plugin to it.
+`llm-ollama` will try to connect to a server at the default `localhost:11434` address. If your Ollama server is remote or runs on a non-default port, you can use `OLLAMA_HOST` environment variable to point the plugin to it, e.g.:
+
+```bash
+export OLLAMA_HOST=https://192.168.1.13:11434
+```
 
 ## Development
 
