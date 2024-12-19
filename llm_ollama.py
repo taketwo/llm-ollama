@@ -166,44 +166,8 @@ class _SharedOllama:
                     for attachment in prev_response.attachments
                 ]
 
-            messages.append({"role": "assistant", "content": prev_response.text()})
-        if prompt.system and prompt.system != current_system:
-            messages.append({"role": "system", "content": prompt.system})
-        messages.append({"role": "user", "content": prompt.prompt})
-        return messages
-
-    async def build_messages_async(self, prompt, conversation):
-        """Asynchronous version of building messages"""
-        messages = []
-        if not conversation:
-            if prompt.system:
-                messages.append({"role": "system", "content": prompt.system})
-            messages.append({"role": "user", "content": prompt.prompt})
-            if prompt.attachments:
-                messages[-1]["images"] = [
-                    attachment.base64_content() for attachment in prompt.attachments
-                ]
-            return messages
-
-        current_system = None
-        for prev_response in conversation.responses:
-            if (
-                prev_response.prompt.system
-                and prev_response.prompt.system != current_system
-            ):
-                messages.append(
-                    {"role": "system", "content": prev_response.prompt.system},
-                )
-                current_system = prev_response.prompt.system
-            messages.append({"role": "user", "content": prev_response.prompt.prompt})
-            if prev_response.attachments:
-                messages[-1]["images"] = [
-                    attachment.base64_content()
-                    for attachment in prev_response.attachments
-                ]
-
             messages.append(
-                {"role": "assistant", "content": await prev_response.text()}
+                {"role": "assistant", "content": prev_response.text_or_raise()}
             )
         if prompt.system and prompt.system != current_system:
             messages.append({"role": "system", "content": prompt.system})
@@ -265,7 +229,7 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
             response (llm.Response): The response object to populate.
             conversation (Optional): The conversation context.
         """
-        messages = await self.build_messages_async(prompt, conversation)
+        messages = self.build_messages(prompt, conversation)
         response._prompt_json = {"messages": messages}
 
         options = prompt.options.model_dump(exclude_none=True)
