@@ -166,7 +166,9 @@ class _SharedOllama:
                     for attachment in prev_response.attachments
                 ]
 
-            messages.append({"role": "assistant", "content": prev_response.text()})
+            messages.append(
+                {"role": "assistant", "content": prev_response.text_or_raise()}
+            )
         if prompt.system and prompt.system != current_system:
             messages.append({"role": "system", "content": prompt.system})
         messages.append({"role": "user", "content": prompt.prompt})
