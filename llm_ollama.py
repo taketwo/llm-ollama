@@ -174,6 +174,13 @@ class _SharedOllama:
         messages.append({"role": "user", "content": prompt.prompt})
         return messages
 
+    def set_usage(self, response, usage):
+        if not usage:
+            return
+        input_tokens = usage.pop("prompt_tokens")
+        output_tokens = usage.pop("completion_tokens")
+        response.set_usage(input=input_tokens, output=output_tokens)
+
 
 class Ollama(_SharedOllama, llm.Model):
     def execute(
@@ -188,6 +195,7 @@ class Ollama(_SharedOllama, llm.Model):
         options = prompt.options.model_dump(exclude_none=True)
         json_object = options.pop("json_object", None)
         kwargs = {}
+        usage = None
         if json_object:
             kwargs["format"] = "json"
 
@@ -201,6 +209,11 @@ class Ollama(_SharedOllama, llm.Model):
             )
             for chunk in response_stream:
                 with contextlib.suppress(KeyError):
+                    if chunk["done"]:
+                        usage = {
+                            "prompt_tokens": chunk["prompt_eval_count"],
+                            "completion_tokens": chunk["eval_count"],
+                        }
                     yield chunk["message"]["content"]
         else:
             response.response_json = ollama.Client().chat(
@@ -209,7 +222,12 @@ class Ollama(_SharedOllama, llm.Model):
                 options=options,
                 **kwargs,
             )
+            usage = {
+                "prompt_tokens": response.response_json["prompt_eval_count"],
+                "completion_tokens": response.response_json["eval_count"],
+            }
             yield response.response_json["message"]["content"]
+        self.set_usage(response, usage)
 
 
 class AsyncOllama(_SharedOllama, llm.AsyncModel):
@@ -235,6 +253,7 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
         options = prompt.options.model_dump(exclude_none=True)
         json_object = options.pop("json_object", None)
         kwargs = {}
+        usage = None
         if json_object:
             kwargs["format"] = "json"
 
@@ -250,6 +269,11 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                 async for chunk in response_stream:
                     with contextlib.suppress(KeyError):
                         yield chunk["message"]["content"]
+                        if chunk["done"]:
+                            usage = {
+                                "prompt_tokens": chunk["prompt_eval_count"],
+                                "completion_tokens": chunk["eval_count"],
+                            }
             else:
                 response.response_json = await ollama.AsyncClient().chat(
                     model=self.model_id,
@@ -257,7 +281,12 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                     options=options,
                     **kwargs,
                 )
+                usage = {
+                    "prompt_tokens": response.response_json["prompt_eval_count"],
+                    "completion_tokens": response.response_json["eval_count"],
+                }
                 yield response.response_json["message"]["content"]
+            self.set_usage(response, usage)
         except Exception as e:
             raise RuntimeError(f"Async execution failed: {e}") from e
 
