@@ -173,15 +173,14 @@ class _SharedOllama:
             messages.append({"role": "system", "content": prompt.system})
         messages.append({"role": "user", "content": prompt.prompt})
         return messages
-    
+
     def set_usage(self, response, usage):
         if not usage:
             return
         input_tokens = usage.pop("prompt_tokens")
         output_tokens = usage.pop("completion_tokens")
-        response.set_usage(
-            input=input_tokens, output=output_tokens
-        )
+        response.set_usage(input=input_tokens, output=output_tokens)
+
 
 class Ollama(_SharedOllama, llm.Model):
     def execute(
@@ -212,8 +211,8 @@ class Ollama(_SharedOllama, llm.Model):
                 with contextlib.suppress(KeyError):
                     if chunk["done"]:
                         usage = {
-                            'prompt_tokens': chunk["prompt_eval_count"],
-                            'completion_tokens': chunk["eval_count"],
+                            "prompt_tokens": chunk["prompt_eval_count"],
+                            "completion_tokens": chunk["eval_count"],
                         }
                     yield chunk["message"]["content"]
         else:
@@ -224,8 +223,8 @@ class Ollama(_SharedOllama, llm.Model):
                 **kwargs,
             )
             usage = {
-                'prompt_tokens': response.response_json["prompt_eval_count"],
-                'completion_tokens': response.response_json["eval_count"],
+                "prompt_tokens": response.response_json["prompt_eval_count"],
+                "completion_tokens": response.response_json["eval_count"],
             }
             yield response.response_json["message"]["content"]
         self.set_usage(response, usage)
@@ -272,8 +271,8 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                         yield chunk["message"]["content"]
                         if chunk["done"]:
                             usage = {
-                                'prompt_tokens': chunk["prompt_eval_count"],
-                                'completion_tokens': chunk["eval_count"],
+                                "prompt_tokens": chunk["prompt_eval_count"],
+                                "completion_tokens": chunk["eval_count"],
                             }
             else:
                 response.response_json = await ollama.AsyncClient().chat(
@@ -283,8 +282,8 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                     **kwargs,
                 )
                 usage = {
-                    'prompt_tokens': response.response_json["prompt_eval_count"],
-                    'completion_tokens': response.response_json["eval_count"],
+                    "prompt_tokens": response.response_json["prompt_eval_count"],
+                    "completion_tokens": response.response_json["eval_count"],
                 }
                 yield response.response_json["message"]["content"]
             self.set_usage(response, usage)
