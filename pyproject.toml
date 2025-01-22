@@ -6,7 +6,11 @@ readme = "README.md"
 authors = [{ name = "Sergey Alexandrov" }]
 license = { text = "Apache-2.0" }
 classifiers = ["License :: OSI Approved :: Apache Software License"]
-dependencies = ["llm>=0.19", "ollama>=0.4", "pydantic>=2"]
+dependencies = [
+    "llm>=0.19",
+    "ollama>=0.4",
+    "pydantic>=2",
+]
 requires-python = ">=3.9"
 
 [project.urls]
