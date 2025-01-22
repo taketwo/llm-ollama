@@ -46,6 +46,13 @@ def mock_ollama():
                     },
                 },
                 {
+                    "model": "llama2:7b-q4_K_M",
+                    "digest": "78e26419b4469263f75331927a00a0284ef6544c1975b826b15abdaef17bb962",
+                    "modelinfo": {
+                        "general.architecture": "llama",
+                    },
+                },
+                {
                     "model": "llama2:latest",
                     "digest": "78e26419b4469263f75331927a00a0284ef6544c1975b826b15abdaef17bb962",
                     "modelinfo": {
@@ -67,6 +74,20 @@ def mock_ollama():
                         "bert.pooling_type": 2,
                     },
                 },
+                {
+                    "model": "deepseek-r1:70b",
+                    "digest": "0c1615a8ca32ef41e433aa420558b4685f9fc7f3fd74119860a8e2e389cd7942",
+                    "modelinfo": {
+                        "general.architecture": "llama",
+                    },
+                },
+                {
+                    "model": "deepseek-r1:70b-llama-distill-q4_K_M",
+                    "digest": "0c1615a8ca32ef41e433aa420558b4685f9fc7f3fd74119860a8e2e389cd7942",
+                    "modelinfo": {
+                        "general.architecture": "llama",
+                    },
+                },
             ],
         }
         mock_list.return_value = return_value
@@ -84,7 +105,8 @@ def test_plugin_is_installed():
 
 def test_registered_chat_models(mock_ollama):
     expected = (
-        ("llama2:7b", ["llama2:latest", "llama2"]),
+        ("deepseek-r1:70b-llama-distill-q4_K_M", ["deepseek-r1:70b"]),
+        ("llama2:7b-q4_K_M", ["llama2:7b", "llama2:latest", "llama2"]),
         ("phi3:latest", ["phi3"]),
         ("stable-code:3b", []),
     )
@@ -100,7 +122,8 @@ def test_registered_chat_models(mock_ollama):
 
 def test_registered_embedding_models(mock_ollama):
     expected = (
-        ("llama2:7b", ["llama2:latest", "llama2"]),
+        ("deepseek-r1:70b-llama-distill-q4_K_M", ["deepseek-r1:70b"]),
+        ("llama2:7b-q4_K_M", ["llama2:7b", "llama2:latest", "llama2"]),
         ("mxbai-embed-large:latest", ["mxbai-embed-large"]),
         ("phi3:latest", ["phi3"]),
         ("stable-code:3b", []),

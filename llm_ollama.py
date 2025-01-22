@@ -323,11 +323,11 @@ class OllamaEmbed(llm.EmbeddingModel):
         yield from result["embeddings"]
 
 
-def _pick_primary_name(names: List[str]) -> Tuple[str, List[str]]:
+def _pick_primary_name(names: List[str]) -> Tuple[str, Tuple[str, ...]]:
     """Pick the primary model name from a list of names.
 
-    The picking algorithm prefers names with the most specific tag, e.g. "llama2:7b"
-    over "llama2:latest" over "llama2".
+    The picking algorithm prefers names with the most specific tag, e.g. "llama2:7b-q4_K_M"
+    over "llama2:7b" over "llama2:latest" over "llama2".
 
     Parameters
     ----------
@@ -336,8 +336,8 @@ def _pick_primary_name(names: List[str]) -> Tuple[str, List[str]]:
 
     Returns
     -------
-    tuple[str, list[str, ...]]
-        The primary model name and a list with the secondary names.
+    tuple[str, tuple[str, ...]]
+        The primary model name and a tuple with the secondary names.
 
     """
     if len(names) == 1:
@@ -345,9 +345,10 @@ def _pick_primary_name(names: List[str]) -> Tuple[str, List[str]]:
     sorted_names = sorted(
         names,
         key=lambda name: (
-            ":" not in name,
-            name.endswith(":latest"),
-            name,
+            ":" not in name,  # Prefer names with a colon
+            name.endswith(":latest"),  # Non-latest tags preferred over latest
+            -len(name),  # Prefer longer names (likely more specific/quantized)
+            name,  # Finally sort by name itself
         ),
     )
     return sorted_names[0], tuple(sorted_names[1:])
