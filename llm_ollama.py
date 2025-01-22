@@ -202,12 +202,21 @@ class Ollama(_SharedOllama, llm.Model):
             for chunk in response_stream:
                 with contextlib.suppress(KeyError):
                     yield chunk["message"]["content"]
+                if chunk["done"]:
+                    response.set_usage(
+                        input=chunk["prompt_eval_count"],
+                        output=chunk["eval_count"],
+                    )
         else:
             response.response_json = ollama.Client().chat(
                 model=self.model_id,
                 messages=messages,
                 options=options,
                 **kwargs,
+            )
+            response.set_usage(
+                input=response.response_json["prompt_eval_count"],
+                output=response.response_json["eval_count"],
             )
             yield response.response_json["message"]["content"]
 
@@ -250,12 +259,21 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                 async for chunk in response_stream:
                     with contextlib.suppress(KeyError):
                         yield chunk["message"]["content"]
+                    if chunk["done"]:
+                        response.set_usage(
+                            input=chunk["prompt_eval_count"],
+                            output=chunk["eval_count"],
+                        )
             else:
                 response.response_json = await ollama.AsyncClient().chat(
                     model=self.model_id,
                     messages=messages,
                     options=options,
                     **kwargs,
+                )
+                response.set_usage(
+                    input=response.response_json["prompt_eval_count"],
+                    output=response.response_json["eval_count"],
                 )
                 yield response.response_json["message"]["content"]
         except Exception as e:
