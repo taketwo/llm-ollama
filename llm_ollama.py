@@ -318,7 +318,6 @@ def _pick_primary_name(names: List[str]) -> Tuple[str, Tuple[str, ...]]:
         key=lambda name: (
             ":" not in name,  # Prefer names with a colon
             name.endswith(":latest"),  # Non-latest tags preferred over latest
-            -len(name.split(":")[1].split("-")) if ":" in name else 0,  # Prefer more specific tags (more components)
             -len(name),  # Prefer longer names (likely more specific/quantized)
             name,  # Finally sort by name itself
         ),
