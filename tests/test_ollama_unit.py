@@ -1,4 +1,3 @@
-import os
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -13,11 +12,6 @@ from llm import (
 from llm.plugins import load_plugins, pm
 
 from llm_ollama import Ollama, OllamaEmbed
-
-from ollama import AsyncClient
-
-
-IN_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") == "true"
 
 
 @pytest.fixture
@@ -182,17 +176,6 @@ def test_registered_models_when_ollama_is_down(mock_ollama_list):
     assert not any(isinstance(m.model, Ollama) for m in get_models_with_aliases())
 
 
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_actual_run():
-    """Tests actual run. Needs llama3.2"""
-    model = get_async_model("llama3.2:latest")
-    response = model.prompt("a short poem about tea")
-    response_text = await response.text()
-    assert len(response_text) > 0
-
-
-@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_async_ollama_call(mock_ollama):
     # Mock the asynchronous chat method to return an async iterable
