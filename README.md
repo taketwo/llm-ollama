@@ -136,11 +136,17 @@ Now install the dependencies:
 pip install -e '.[test,lint]'
 ```
 
-To run the tests:
+To run unit and integration tests:
 
 ```bash
 python -m pytest
 ```
+
+Integration tests require a running Ollama server and will be:
+- Enabled automatically if an Ollama server is available;
+- Skipped if Ollama server is unavailable;
+- Force-enabled with `--integration` (but fail if Ollama server is unavailable);
+- Force-disabled with `--no-integration`.
 
 To format the code:
 
