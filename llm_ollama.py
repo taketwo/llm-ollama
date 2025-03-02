@@ -52,6 +52,7 @@ def register_embedding_models(register):
 
 class _SharedOllama:
     can_stream: bool = True
+    supports_schema: bool = True
     attachment_types = {
         "image/png",
         "image/jpeg",
@@ -198,6 +199,8 @@ class Ollama(_SharedOllama, llm.Model):
         usage = None
         if json_object:
             kwargs["format"] = "json"
+        elif prompt.schema:
+            kwargs["format"] = prompt.schema
 
         if stream:
             response_stream = ollama.Client().chat(
@@ -256,6 +259,8 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
         usage = None
         if json_object:
             kwargs["format"] = "json"
+        elif prompt.schema:
+            kwargs["format"] = prompt.schema
 
         try:
             if stream:
