@@ -47,7 +47,7 @@ Type '!multi' to enter multiple lines, then '!end' to finish
 
 ### Image attachments
 
-Multi-modal Ollama models can accept image attachments using the [LLM attachments](https://llm.datasette.io/en/stable/usage.html#attachments) options:
+Multi-modal Ollama models can accept image attachments using the [LLM attachments](https://llm.datasette.io/en/stable/usage.html#attachments) option:
 
 ```bash
 llm -m llava "Describe this image" -a https://static.simonwillison.net/static/2024/pelicans.jpg
@@ -62,6 +62,14 @@ llm embed -m mxbai-embed-large -i README.md
 ```
 
 By default, the input will be truncated from the end to fit within the context length. This behavior can be changed by setting `OLLAMA_EMBED_TRUNCATE=no` environment variable. In such case, embedding operation will fail if context length is exceeded.
+
+### JSON schemas
+
+Ollama's built-in support for [structured outputs](https://ollama.com/blog/structured-outputs) can be accessed through [LLM schemas](https://llm.datasette.io/en/stable/embeddings/cli.html), for example:
+
+```bash
+llm -m llama3.2 --schema "name, age int, one_sentence_bio" "invent a cool dog"
+```
 
 ### Async models
 
