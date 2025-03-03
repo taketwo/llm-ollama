@@ -65,7 +65,7 @@ By default, the input will be truncated from the end to fit within the context l
 
 ### JSON schemas
 
-Ollama's built-in support for [structured outputs](https://ollama.com/blog/structured-outputs) can be accessed through [LLM schemas](https://llm.datasette.io/en/stable/embeddings/cli.html), for example:
+Ollama's built-in support for [structured outputs](https://ollama.com/blog/structured-outputs) can be accessed through [LLM schemas](https://llm.datasette.io/en/stable/schemas.html), for example:
 
 ```bash
 llm -m llama3.2 --schema "name, age int, one_sentence_bio" "invent a cool dog"
