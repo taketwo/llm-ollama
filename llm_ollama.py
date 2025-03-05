@@ -8,7 +8,6 @@ import click
 import llm
 import ollama
 from pydantic import Field, TypeAdapter, ValidationError
-import json
 
 
 @llm.hookimpl
