@@ -8,6 +8,7 @@ import click
 import llm
 import ollama
 from pydantic import Field, TypeAdapter, ValidationError
+import json
 
 
 @llm.hookimpl
@@ -219,12 +220,13 @@ class Ollama(_SharedOllama, llm.Model):
                         }
                     yield chunk["message"]["content"]
         else:
-            response.response_json = ollama.Client().chat(
+            ollama_response = ollama.Client().chat(
                 model=self.model_id,
                 messages=messages,
                 options=options,
                 **kwargs,
             )
+            response.response_json = ollama_response.dict()
             usage = {
                 "prompt_tokens": response.response_json["prompt_eval_count"],
                 "completion_tokens": response.response_json["eval_count"],
