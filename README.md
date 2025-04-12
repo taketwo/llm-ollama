@@ -130,18 +130,30 @@ export OLLAMA_HOST=https://192.168.1.13:11434
 
 ## Development
 
-To set up this plugin locally, first checkout the code. Then create a new virtual environment:
+### Setup
+
+To set up this plugin locally, first checkout the code. Then create a new virtual environment and install the dependencies. If you are using `uv`:
 
 ```bash
 cd llm-ollama
-python3 -m venv venv
-source venv/bin/activate
+uv venv
+uv pip install -e '.[test,lint]'
 ```
 
-Now install the dependencies:
+Otherwise, if you prefer using standard tools:
 
 ```bash
+cd llm-ollama
+python3 -m venv .venv
 pip install -e '.[test,lint]'
+```
+
+### Testing and linting
+
+To test or lint the code, first activate the environment:
+
+```bash
+source .venv/bin/activate
 ```
 
 To run unit and integration tests:
