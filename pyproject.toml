@@ -21,3 +21,7 @@ ollama = "llm_ollama"
 [project.optional-dependencies]
 test = ["pytest", "pytest-asyncio"]
 lint = ["black"]
+
+[tool.setuptools.packages.find]
+include = ["llm_ollama*"]
+exclude = ["cache"]
