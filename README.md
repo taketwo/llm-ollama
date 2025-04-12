@@ -17,7 +17,7 @@ llm install llm-ollama
 
 ## Usage
 
-First, ensure that your Ollama server is running and that you have pulled some models. You can use `ollama list` to check what is locally available.
+First, ensure that the Ollama server is running and that you have pulled some models. You can use `ollama list` to check what is locally available.
 
 The plugin will query the Ollama server for the list of models. You can use `llm ollama list-models` to see the list; it should be the same as output by `ollama list`. All these models will be automatically registered with LLM and made available for prompting, chatting, and embedding.
 
@@ -61,7 +61,7 @@ The plugin supports [LLM embeddings](https://llm.datasette.io/en/stable/embeddin
 llm embed -m mxbai-embed-large -i README.md
 ```
 
-By default, the input will be truncated from the end to fit within the context length. This behavior can be changed by setting `OLLAMA_EMBED_TRUNCATE=no` environment variable. In such case, embedding operation will fail if context length is exceeded.
+By default, the input will be truncated from the end to fit within the context length. This behavior can be changed by setting `OLLAMA_EMBED_TRUNCATE=no` environment variable. In such cases, embedding operation will fail if the context length is exceeded.
 
 ### JSON schemas
 
