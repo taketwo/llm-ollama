@@ -7,7 +7,11 @@ from typing import List, Optional, Tuple
 import click
 import llm
 import ollama
+
+from cache import Cache
 from pydantic import Field, TypeAdapter, ValidationError
+
+cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
 
 
 @llm.hookimpl
@@ -31,9 +35,9 @@ def register_models(register):
         models[digest].append(name)
         if name.endswith(":latest"):
             models[digest].append(name[: -len(":latest")])
-    for names in models.values():
+    for digest, names in models.items():
         name, aliases = _pick_primary_name(names)
-        if not _ollama_model_capability_completion(name):
+        if not _ollama_model_capability_completion(digest, name):
             continue
         register(Ollama(name), AsyncOllama(name), aliases=aliases)
 
@@ -377,7 +381,8 @@ def _get_ollama_models() -> List[dict]:
         return []
 
 
-def _ollama_model_capability_completion(model: str) -> bool:
+@cache("model_capabilities", key="digest")
+def _ollama_model_capability_completion(digest: str, model: str) -> bool:
     """Check if a model is capable of completion.
 
     This is a indicator for if a model can be used for chat or if its an embedding only
