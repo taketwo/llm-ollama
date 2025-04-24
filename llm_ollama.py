@@ -7,7 +7,18 @@ from typing import List, Optional, Tuple
 import click
 import llm
 import ollama
+from urllib.parse import urlsplit
+import httpx
 from pydantic import Field, TypeAdapter, ValidationError
+
+client = ollama
+async_client = ollama.AsyncClient()
+host = os.getenv("OLLAMA_HOST")
+split = urlsplit(host)
+if split.username and split.password:
+    httpx_auth = httpx.BasicAuth(username=split.username, password=split.password)
+    client = ollama.Client(host=host, auth=httpx_auth)
+    async_client = ollama.AsyncClient(host=host, auth=httpx_auth)
 
 
 @llm.hookimpl
@@ -203,7 +214,7 @@ class Ollama(_SharedOllama, llm.Model):
             kwargs["format"] = prompt.schema
 
         if stream:
-            response_stream = ollama.Client().chat(
+            response_stream = client.chat(
                 model=self.model_id,
                 messages=messages,
                 stream=True,
@@ -219,7 +230,7 @@ class Ollama(_SharedOllama, llm.Model):
                         }
                     yield chunk["message"]["content"]
         else:
-            ollama_response = ollama.Client().chat(
+            ollama_response = client.chat(
                 model=self.model_id,
                 messages=messages,
                 options=options,
@@ -265,7 +276,7 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
 
         try:
             if stream:
-                response_stream = await ollama.AsyncClient().chat(
+                response_stream = await async_client.chat(
                     model=self.model_id,
                     messages=messages,
                     stream=True,
@@ -281,7 +292,7 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                                 "completion_tokens": chunk["eval_count"],
                             }
             else:
-                ollama_response = await ollama.AsyncClient().chat(
+                ollama_response = await async_client.chat(
                     model=self.model_id,
                     messages=messages,
                     options=options,
@@ -322,7 +333,7 @@ class OllamaEmbed(llm.EmbeddingModel):
         return f"Ollama: {self.model_id}"
 
     def embed_batch(self, items):
-        result = ollama.embed(
+        result = client.embed(
             model=self.model_id,
             input=items,
             truncate=self.truncate,
@@ -372,7 +383,7 @@ def _get_ollama_models() -> List[dict]:
 
     """
     try:
-        return ollama.list()["models"]
+        return client.list()["models"]
     except:
         return []
 
@@ -406,7 +417,7 @@ def _ollama_model_capability_completion(model: str) -> bool:
     """
     is_embedding_model = False
     try:
-        model_data = ollama.show(model)
+        model_data = client.show(model)
 
         model_info = model_data["modelinfo"]
         model_arch = model_info["general.architecture"]
