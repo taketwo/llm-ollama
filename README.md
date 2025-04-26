@@ -128,6 +128,21 @@ Additionally, the `-o json_object 1` option can be used to force the model to re
 export OLLAMA_HOST=https://192.168.1.13:11434
 ```
 
+### Authentication
+
+If your Ollama server is protected with Basic Authentication, you can include the credentials directly in the `OLLAMA_HOST` environment variable:
+
+```bash
+export OLLAMA_HOST=https://username:password@192.168.1.13:11434
+```
+
+The plugin will parse the credentials and use them for authentication. Special characters in usernames or passwords should be URL-encoded:
+
+```bash
+# For username "user@domain" and password "p@ssw0rd"
+export OLLAMA_HOST=https://user%40domain:p%40ssw0rd@192.168.1.13:11434
+```
+
 ## Development
 
 ### Setup

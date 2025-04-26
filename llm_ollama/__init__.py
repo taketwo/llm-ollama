@@ -7,6 +7,7 @@ from typing import List, Optional, Tuple
 import click
 import llm
 import ollama
+from llm_ollama.auth import get_async_client, get_client
 
 from llm_ollama.cache import Cache
 
@@ -208,7 +209,7 @@ class Ollama(_SharedOllama, llm.Model):
             kwargs["format"] = prompt.schema
 
         if stream:
-            response_stream = ollama.Client().chat(
+            response_stream = get_client().chat(
                 model=self.model_id,
                 messages=messages,
                 stream=True,
@@ -224,7 +225,7 @@ class Ollama(_SharedOllama, llm.Model):
                         }
                     yield chunk["message"]["content"]
         else:
-            ollama_response = ollama.Client().chat(
+            ollama_response = get_client().chat(
                 model=self.model_id,
                 messages=messages,
                 options=options,
@@ -270,7 +271,7 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
 
         try:
             if stream:
-                response_stream = await ollama.AsyncClient().chat(
+                response_stream = await get_async_client().chat(
                     model=self.model_id,
                     messages=messages,
                     stream=True,
@@ -286,7 +287,7 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                                 "completion_tokens": chunk["eval_count"],
                             }
             else:
-                ollama_response = await ollama.AsyncClient().chat(
+                ollama_response = await get_async_client().chat(
                     model=self.model_id,
                     messages=messages,
                     options=options,
