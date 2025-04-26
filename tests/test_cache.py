@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 import pytest
 import yaml
 
-from cache import Cache
+from llm_ollama.cache import Cache
 
 
 @pytest.fixture
