@@ -8,7 +8,8 @@ import click
 import llm
 import ollama
 
-from cache import Cache
+from llm_ollama.cache import Cache
+
 from pydantic import Field, TypeAdapter, ValidationError
 
 cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
