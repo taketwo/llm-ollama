@@ -328,7 +328,7 @@ class OllamaEmbed(llm.EmbeddingModel):
         return f"Ollama: {self.model_id}"
 
     def embed_batch(self, items):
-        result = ollama.embed(
+        result = get_client().embed(
             model=self.model_id,
             input=items,
             truncate=self.truncate,
@@ -378,7 +378,7 @@ def _get_ollama_models() -> List[dict]:
 
     """
     try:
-        return ollama.list()["models"]
+        return get_client().list()["models"]
     except:
         return []
 
@@ -413,7 +413,7 @@ def _ollama_model_capability_completion(digest: str, model: str) -> bool:
     """
     is_embedding_model = False
     try:
-        model_data = ollama.show(model)
+        model_data = get_client().show(model)
 
         model_info = model_data["modelinfo"]
         model_arch = model_info["general.architecture"]
