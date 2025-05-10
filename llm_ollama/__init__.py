@@ -59,6 +59,7 @@ def register_embedding_models(register):
 class _SharedOllama:
     can_stream: bool = True
     supports_schema: bool = True
+    supports_tools: bool = True
     attachment_types = {
         "image/png",
         "image/jpeg",
@@ -207,7 +208,10 @@ class Ollama(_SharedOllama, llm.Model):
             kwargs["format"] = "json"
         elif prompt.schema:
             kwargs["format"] = prompt.schema
-
+        if prompt.tools:
+            kwargs["tools"] = [
+                tool.implementation for tool in prompt.tools if tool.implementation
+            ]
         if stream:
             response_stream = get_client().chat(
                 model=self.model_id,
@@ -217,6 +221,14 @@ class Ollama(_SharedOllama, llm.Model):
                 **kwargs,
             )
             for chunk in response_stream:
+                if chunk.message.tool_calls:
+                    for tool_call in chunk.message.tool_calls:
+                        response.add_tool_call(
+                            llm.ToolCall(
+                                name=tool_call.function.name,
+                                arguments=tool_call.function.arguments,
+                            )
+                        )
                 with contextlib.suppress(KeyError):
                     if chunk["done"]:
                         usage = {
@@ -237,6 +249,14 @@ class Ollama(_SharedOllama, llm.Model):
                 "completion_tokens": response.response_json["eval_count"],
             }
             yield response.response_json["message"]["content"]
+            if ollama_response.message.tool_calls:
+                for tool_call in ollama_response.message.tool_calls:
+                    response.add_tool_call(
+                        llm.ToolCall(
+                            name=tool_call.function.name,
+                            arguments=tool_call.function.arguments,
+                        )
+                    )
         self.set_usage(response, usage)
 
 
