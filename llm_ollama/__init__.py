@@ -180,6 +180,13 @@ class _SharedOllama:
         if prompt.system and prompt.system != current_system:
             messages.append({"role": "system", "content": prompt.system})
         messages.append({"role": "user", "content": prompt.prompt})
+        for tool_result in prompt.tool_results:
+            messages.append({
+                "role": "tool",
+                "content": tool_result.output,
+                "name": tool_result.name
+            })
+
         return messages
 
     def set_usage(self, response, usage):
