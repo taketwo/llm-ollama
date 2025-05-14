@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from llm import get_async_model, schema_dsl
+from llm import get_async_model, get_model, schema_dsl
 
 
 @pytest.mark.integration
@@ -31,3 +31,17 @@ async def test_async_model_prompt_with_schema():
     assert "bio" in json_response
     assert "age" in json_response
     assert isinstance(json_response["age"], int)
+
+
+@pytest.mark.integration
+def test_tools():
+    """Test tool execution. Needs llama3.2"""
+
+    def multiply(a: int, b: int):
+        "Multiply two integers"
+        return int(a) * int(b)
+
+    model = get_model("llama3.2:latest")
+    chain = model.chain("12345 * 4312", tools=[multiply])
+    result = chain.text()
+    assert "53231640" in result or "53,231,640" in result
