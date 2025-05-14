@@ -52,6 +52,7 @@ def mock_ollama_client(mocker):
                 "modelinfo": {
                     "general.architecture": "phi3",
                 },
+                "template": "This one supports tools",
             },
             {
                 "model": "mxbai-embed-large:latest",
