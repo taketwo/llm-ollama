@@ -1,4 +1,5 @@
 import contextlib
+from dataclasses import dataclass
 import os
 import warnings
 from collections import defaultdict
@@ -39,9 +40,14 @@ def register_models(register):
             models[digest].append(name[: -len(":latest")])
     for digest, names in models.items():
         name, aliases = _pick_primary_name(names)
-        if not _ollama_model_capability_completion(digest, name):
+        chat_completion, supports_tools = _ollama_model_capabilities(digest, name)
+        if not chat_completion:
             continue
-        register(Ollama(name), AsyncOllama(name), aliases=aliases)
+        register(
+            Ollama(name, supports_tools=supports_tools),
+            AsyncOllama(name, supports_tools=supports_tools),
+            aliases=aliases,
+        )
 
 
 @llm.hookimpl
@@ -139,8 +145,10 @@ class _SharedOllama:
     def __init__(
         self,
         model_id: str,
+        supports_tools: bool = True,
     ) -> None:
         self.model_id = model_id
+        self.supports_tools = supports_tools
 
     def __str__(self) -> str:
         return f"Ollama: {self.model_id}"
@@ -412,9 +420,11 @@ def _get_ollama_models() -> List[dict]:
         return []
 
 
-@cache("model_capabilities", key="digest")
-def _ollama_model_capability_completion(digest: str, model: str) -> bool:
-    """Check if a model is capable of completion.
+@cache("model_capabilities2", key="digest")
+def _ollama_model_capabilities(digest: str, model: str) -> Tuple[bool, bool]:
+    """Check the capabilities of a model.
+
+    chat_completion: bool
 
     This is a indicator for if a model can be used for chat or if its an embedding only
     model.
@@ -428,6 +438,10 @@ def _ollama_model_capability_completion(digest: str, model: str) -> bool:
     note: from what I found, if it is present it is set to '1', but this is not checked
     in the reference code.
 
+    tools: bool
+
+    Looks for "" in the model prompt template, which is a reasonable heuristic.
+
     Parameters
     ----------
     model : str
@@ -435,9 +449,9 @@ def _ollama_model_capability_completion(digest: str, model: str) -> bool:
 
     Returns
     -------
-    bool
-        True if the model is capable of completion, False otherwise.
-        If the model name is not present in Ollama server, False is returned.
+    Completion
+        chat_completion: True if the model is capable of completion, False otherwise.
+        tools: True if the model is capable of using tools, False otherwise.
 
     """
     is_embedding_model = False
@@ -447,10 +461,12 @@ def _ollama_model_capability_completion(digest: str, model: str) -> bool:
         model_info = model_data["modelinfo"]
         model_arch = model_info["general.architecture"]
 
+        supports_tools = "tool" in model_data.get("template", "").lower()
+
         is_embedding_model = f"{model_arch}.pooling_type" in model_info
     except ollama.ResponseError:
         # if ollama.show fails, model name is not present in Ollama server, return False
-        return False
+        return False, False
     # except ConnectionError:
 
-    return not is_embedding_model
+    return not is_embedding_model, supports_tools
