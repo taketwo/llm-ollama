@@ -181,11 +181,13 @@ class _SharedOllama:
             messages.append({"role": "system", "content": prompt.system})
         messages.append({"role": "user", "content": prompt.prompt})
         for tool_result in prompt.tool_results:
-            messages.append({
-                "role": "tool",
-                "content": tool_result.output,
-                "name": tool_result.name
-            })
+            messages.append(
+                {
+                    "role": "tool",
+                    "content": tool_result.output,
+                    "name": tool_result.name,
+                }
+            )
 
         return messages
 
