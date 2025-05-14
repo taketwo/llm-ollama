@@ -1,8 +1,8 @@
 import contextlib
-from dataclasses import dataclass
 import os
 import warnings
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 import click
@@ -420,7 +420,7 @@ def _get_ollama_models() -> List[dict]:
         return []
 
 
-@cache("model_capabilities2", key="digest")
+@cache("model_capabilities", key="digest")
 def _ollama_model_capabilities(digest: str, model: str) -> Tuple[bool, bool]:
     """Check the capabilities of a model.
 
@@ -440,7 +440,7 @@ def _ollama_model_capabilities(digest: str, model: str) -> Tuple[bool, bool]:
 
     tools: bool
 
-    Looks for "" in the model prompt template, which is a reasonable heuristic.
+    Looks for "tool" in the model prompt template, which is a reasonable heuristic.
 
     Parameters
     ----------
@@ -449,9 +449,9 @@ def _ollama_model_capabilities(digest: str, model: str) -> Tuple[bool, bool]:
 
     Returns
     -------
-    Completion
-        chat_completion: True if the model is capable of completion, False otherwise.
-        tools: True if the model is capable of using tools, False otherwise.
+    tuple[bool, bool]
+        - chat_completion: True if the model can be used for chats, False otherwise.
+        - supports_tools: True if the model supports tools, False otherwise.
 
     """
     is_embedding_model = False

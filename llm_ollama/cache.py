@@ -25,7 +25,7 @@ class Cache:
 
     """
 
-    CACHE_VERSION = 1
+    CACHE_VERSION = 2
 
     def __init__(self, cache_dir: Path) -> None:
         """Initialize a cache with the specified directory.
