@@ -1,6 +1,6 @@
 [project]
 name = "llm-ollama"
-version = "0.11a0"
+version = "0.11"
 description = "LLM plugin providing access to local Ollama models"
 readme = "README.md"
 authors = [{ name = "Sergey Alexandrov" }]
