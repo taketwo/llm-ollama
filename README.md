@@ -53,6 +53,15 @@ Multi-modal Ollama models can accept image attachments using the [LLM attachment
 llm -m llava "Describe this image" -a https://static.simonwillison.net/static/2024/pelicans.jpg
 ```
 
+### Tools
+
+Some models such as [Qwen 3](https://ollama.com/library/qwen3) support [tools](https://llm.datasette.io/en/stable/tools.html). Ollama have a [list of tool supporting models](https://ollama.com/search?c=tools).
+```bash
+ollama pull qwen3:4b
+
+llm -m qwen3:4b -T llm_time 'What is the time?' --td
+```
+
 ### Embeddings
 
 The plugin supports [LLM embeddings](https://llm.datasette.io/en/stable/embeddings/cli.html). Both regular and specialized embedding models (such as `mxbai-embed-large`) can be used:
