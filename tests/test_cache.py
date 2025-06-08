@@ -25,13 +25,13 @@ def func(value):
 
 @pytest.fixture
 def func_instrumented():
-    """Fixture providing a instrumented version of the sample function."""
+    """Fixture providing an instrumented version of the sample function."""
     return Mock(side_effect=func)
 
 
 @pytest.fixture
 def func_decorated(cache, func_instrumented):
-    """Fixture providing a the sample function decorated for caching."""
+    """Fixture providing the sample function decorated for caching."""
     return cache("sample", key="value")(func_instrumented)
 
 
