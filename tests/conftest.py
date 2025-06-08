@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from _pytest.fixtures import SubRequest
 
@@ -41,6 +43,14 @@ def pytest_configure(config: pytest.Config) -> None:
         raise pytest.UsageError(
             "--integration and --no-integration are mutually exclusive",
         )
+
+
+@pytest.fixture(autouse=True)
+def _isolated_cache(tmp_path: Path) -> None:
+    """Set isolated cache directory for each test."""
+    import llm_ollama
+
+    llm_ollama.cache.set_dir(tmp_path / "test_cache")
 
 
 @pytest.fixture(autouse=True)
