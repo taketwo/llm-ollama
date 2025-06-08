@@ -128,7 +128,8 @@ class TestCacheInvalidation:
         assert func_instrumented.call_count == 1
 
         # Create a new cache with a different version
-        with patch.object(Cache, "CACHE_VERSION", 3):
+        current_cache_version = Cache.CACHE_VERSION
+        with patch.object(Cache, "CACHE_VERSION", current_cache_version + 1):
             cache2 = Cache(cache_dir)
             func_decorated2 = cache2("sample", key="value")(
                 lambda value: func_instrumented(value),
