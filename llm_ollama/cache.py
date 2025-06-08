@@ -3,7 +3,7 @@
 import functools
 import inspect
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 import yaml
 
@@ -27,12 +27,27 @@ class Cache:
 
     CACHE_VERSION = 2
 
-    def __init__(self, cache_dir: Path) -> None:
+    def __init__(self, cache_dir: Union[Path, str]) -> None:
         """Initialize a cache with the specified directory.
 
         Parameters
         ----------
-        cache_dir : Path
+        cache_dir : Path | str
+            Path to the directory where cache files will be stored. The directory will
+            be created if it does not exist.
+
+        """
+        self.set_dir(cache_dir)
+
+    def set_dir(self, cache_dir: Union[Path, str]) -> None:
+        """Set the directory where cache files are stored.
+
+        This does not migrate existing cache files. The cache will start fresh in the
+        new directory.
+
+        Parameters
+        ----------
+        cache_dir : Path | str
             Path to the directory where cache files will be stored. The directory will
             be created if it does not exist.
 
@@ -56,8 +71,6 @@ class Cache:
         if not isinstance(key, str):
             raise TypeError("Key must be a string parameter name")
 
-        cache_file = self.cache_dir / f"{cache_name}.yaml"
-
         def decorator(func):
             sig = inspect.signature(func)
             param_names = list(sig.parameters.keys())
@@ -79,6 +92,7 @@ class Cache:
                         f"Parameter '{key}' is not serializable for YAML",
                     ) from e
 
+                cache_file = self.cache_dir / f"{cache_name}.yaml"
                 cache: Dict[str, Any] = {}
                 try:
                     with cache_file.open("r") as f:

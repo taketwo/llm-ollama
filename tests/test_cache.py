@@ -182,6 +182,53 @@ class TestCacheInvalidation:
         assert "test" in cache_data["data"]
 
 
+class TestSetDir:
+    """Tests for the set_dir method."""
+
+    def test_set_dir_changes_directory(self, cache, cache_dir, tmp_path):
+        """Test that set_dir changes the cache directory."""
+
+        assert cache.cache_dir == cache_dir
+        new_dir = tmp_path / "new"
+        cache.set_dir(new_dir)
+        assert cache.cache_dir == new_dir
+        assert new_dir.exists()
+
+    def test_set_dir_affects_future_cache_operations(
+        self,
+        cache,
+        cache_dir,
+        tmp_path,
+        func_instrumented,
+    ):
+        """Test that set_dir affects where cache files are created."""
+
+        func_decorated = cache("sample", key="value")(
+            lambda value: func_instrumented(value),
+        )
+
+        assert func_decorated("foo") == func("foo")
+        assert func_instrumented.call_count == 1
+
+        original_cache_file = cache_dir / "sample.yaml"
+        assert original_cache_file.exists()
+
+        new_dir = tmp_path / "new"
+        cache.set_dir(new_dir)
+
+        assert func_decorated("bar") == func("bar")
+        assert func_instrumented.call_count == 2
+
+        new_cache_file = new_dir / "sample.yaml"
+        assert new_cache_file.exists()
+
+        # Verify new cache has only the new data
+        with new_cache_file.open("r") as f:
+            cache_data = yaml.safe_load(f)
+        assert "bar" in cache_data["data"]
+        assert "foo" not in cache_data["data"]
+
+
 class TestCacheDecoratorWithMethods:
     """Tests for caching on methods and more complex scenarios."""
 
