@@ -110,6 +110,20 @@ class TestCacheDecorator:
         with pytest.raises(TypeError, match="Key must be a string parameter name"):
             cache("sample", key=123)(func)
 
+    def test_non_serializable_cache_key(self, cache):
+        """Test error handling for non-serializable cache keys."""
+
+        class NonSerializable:
+            def __str__(self):
+                raise TypeError("Cannot convert to string")
+
+        @cache("sample", key="value")
+        def test_func(value):
+            return f"result-{value}"
+
+        with pytest.raises(ValueError, match="not serializable for YAML"):
+            test_func(NonSerializable())
+
 
 class TestCacheInvalidation:
     """Tests for cache invalidation mechanisms."""
