@@ -2,11 +2,10 @@ import contextlib
 import os
 import warnings
 from collections import defaultdict
-from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-import click
 import llm
+from llm.utils import dicts_to_table_string
 
 from llm_ollama.auth import get_async_client, get_client
 from llm_ollama.cache import Cache
@@ -19,14 +18,24 @@ cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
 @llm.hookimpl
 def register_commands(cli):
     @cli.group(name="ollama")
-    def ollama_group():
-        "Commands for working with models hosted on Ollama"
+    def ollama_group() -> None:
+        """Commands for working with models hosted on Ollama server."""
 
-    @ollama_group.command(name="list-models")
-    def list_models():
-        """List models that are available locally on Ollama server."""
-        for model in _get_ollama_models():
-            click.echo(model["model"])
+    @ollama_group.command()
+    def models() -> None:
+        """List models that are available on Ollama server."""
+        to_print = [
+            {
+                "model": model["model"],
+                "digest": model["digest"][:12],
+                "capabilities": ", ".join(
+                    _get_ollama_model_capabilities(model["digest"], model["model"]),
+                ),
+            }
+            for model in _get_ollama_models()
+        ]
+        done = dicts_to_table_string(["model", "digest", "capabilities"], to_print)
+        print("\n".join(done))
 
 
 @llm.hookimpl
