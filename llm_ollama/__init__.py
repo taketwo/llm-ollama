@@ -39,9 +39,10 @@ def register_models(register):
             models[digest].append(name[: -len(":latest")])
     for digest, names in models.items():
         name, aliases = _pick_primary_name(names)
-        chat_completion, supports_tools = _ollama_model_capabilities(digest, name)
-        if not chat_completion:
+        capabilities = _get_ollama_model_capabilities(digest, name)
+        if "completion" not in capabilities:
             continue
+        supports_tools = "tools" in capabilities
         register(
             Ollama(name, supports_tools=supports_tools),
             AsyncOllama(name, supports_tools=supports_tools),
@@ -420,52 +421,16 @@ def _get_ollama_models() -> List[dict]:
 
 
 @cache("model_capabilities", key="digest")
-def _ollama_model_capabilities(digest: str, model: str) -> Tuple[bool, bool]:
-    """Check the capabilities of a model.
+def _get_ollama_model_capabilities(digest: str, model: str) -> List[str]:
+    """Get a list of capabilities for a given Ollama model.
 
-    chat_completion: bool
-
-    This is a indicator for if a model can be used for chat or if its an embedding only
-    model.
-
-    Source of this check is from Ollama server
-    https://github.com/ollama/ollama/blob/8a9bb0d000ae8201445ef1a590d7136df0a16f8b/server/images.go#L100
-    It works by checking if the model has a pooling_type key in the model_info,
-    making the model an embed only model, incapable of completion.
-    pooling_type is found in 'model_info' as '{model_architecture}.pooling_type'
-    where model_architecture is saved in the 'model_info' under 'general.architecture'.
-    note: from what I found, if it is present it is set to '1', but this is not checked
-    in the reference code.
-
-    tools: bool
-
-    Looks for "tool" in the model prompt template, which is a reasonable heuristic.
-
-    Parameters
-    ----------
-    model : str
-        The model name.
+    This function may raise an exception if the Ollama server is down or the model does
+    not exist.
 
     Returns
     -------
-    tuple[bool, bool]
-        - chat_completion: True if the model can be used for chats, False otherwise.
-        - supports_tools: True if the model supports tools, False otherwise.
+    list[str]
+        A list of capabilities for the given model.
 
     """
-    is_embedding_model = False
-    try:
-        model_data = get_client().show(model)
-
-        model_info = model_data["modelinfo"]
-        model_arch = model_info["general.architecture"]
-
-        supports_tools = "tool" in model_data.get("template", "").lower()
-
-        is_embedding_model = f"{model_arch}.pooling_type" in model_info
-    except ollama.ResponseError:
-        # if ollama.show fails, model name is not present in Ollama server, return False
-        return False, False
-    # except ConnectionError:
-
-    return not is_embedding_model, supports_tools
+    return get_client().show(model).capabilities or []

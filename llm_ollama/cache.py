@@ -25,7 +25,7 @@ class Cache:
 
     """
 
-    CACHE_VERSION = 2
+    CACHE_VERSION = 3
 
     def __init__(self, cache_dir: Union[Path, str]) -> None:
         """Initialize a cache with the specified directory.

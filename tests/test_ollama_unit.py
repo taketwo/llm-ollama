@@ -23,67 +23,57 @@ def mock_ollama_client(mocker):
             {
                 "model": "stable-code:3b",
                 "digest": "aa5ab8afb86208e1c097028d63074f0142ce6079420ea6f68f219933361fd869",
-                "modelinfo": {
-                    "general.architecture": "stablelm",
-                },
+                "model_info": {},
+                "capabilities": ["completion"],
             },
             {
                 "model": "llama2:7b",
                 "digest": "78e26419b4469263f75331927a00a0284ef6544c1975b826b15abdaef17bb962",
-                "modelinfo": {
-                    "general.architecture": "llama",
-                },
+                "model_info": {},
+                "capabilities": ["completion"],
             },
             {
                 "model": "llama2:7b-q4_K_M",
                 "digest": "78e26419b4469263f75331927a00a0284ef6544c1975b826b15abdaef17bb962",
-                "modelinfo": {
-                    "general.architecture": "llama",
-                },
+                "model_info": {},
+                "capabilities": ["completion"],
             },
             {
                 "model": "llama2:latest",
                 "digest": "78e26419b4469263f75331927a00a0284ef6544c1975b826b15abdaef17bb962",
-                "modelinfo": {
-                    "general.architecture": "llama",
-                },
+                "model_info": {},
+                "capabilities": ["completion"],
             },
             {
                 "model": "phi3:latest",
                 "digest": "e2fd6321a5fe6bb3ac8a4e6f1cf04477fd2dea2924cf53237a995387e152ee9c",
-                "modelinfo": {
-                    "general.architecture": "phi3",
-                },
-                "template": "This one supports tools",
+                "model_info": {},
+                "capabilities": ["completion"],
             },
             {
                 "model": "mxbai-embed-large:latest",
                 "digest": "468836162de7f81e041c43663fedbbba921dcea9b9fefea135685a39b2d83dd8",
-                "modelinfo": {
-                    "general.architecture": "bert",
-                    "bert.pooling_type": 2,
-                },
+                "model_info": {},
+                "capabilities": ["embedding"],
             },
             {
                 "model": "deepseek-r1:70b",
                 "digest": "0c1615a8ca32ef41e433aa420558b4685f9fc7f3fd74119860a8e2e389cd7942",
-                "modelinfo": {
-                    "general.architecture": "llama",
-                },
+                "model_info": {},
+                "capabilities": ["completion", "thinking"],
             },
             {
                 "model": "deepseek-r1:70b-llama-distill-q4_K_M",
                 "digest": "0c1615a8ca32ef41e433aa420558b4685f9fc7f3fd74119860a8e2e389cd7942",
-                "modelinfo": {
-                    "general.architecture": "llama",
-                },
+                "model_info": {},
+                "capabilities": ["completion", "thinking"],
             },
         ],
     }
     client = mocker.patch("ollama.Client").return_value
     client.list.return_value = return_value
     client.show.side_effect = lambda name: next(
-        m for m in return_value["models"] if m["model"] == name
+        ollama.ShowResponse(**m) for m in return_value["models"] if m["model"] == name
     )
     return client
 
