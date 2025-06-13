@@ -1,5 +1,7 @@
 from unittest.mock import AsyncMock, Mock
 
+import ollama
+
 import pytest
 
 from httpx import ConnectError
@@ -78,7 +80,7 @@ def mock_ollama_client(mocker):
             },
         ],
     }
-    client = mocker.patch("llm_ollama.ollama.Client").return_value
+    client = mocker.patch("ollama.Client").return_value
     client.list.return_value = return_value
     client.show.side_effect = lambda name: next(
         m for m in return_value["models"] if m["model"] == name
@@ -157,7 +159,7 @@ def test_model_embed(
 
     client = Mock()
     client.embed.return_value = {"embeddings": [expected]}
-    mocker.patch("llm_ollama.ollama.Client", return_value=client)
+    mocker.patch("ollama.Client", return_value=client)
 
     if envvar_value is not None:
         monkeypatch.setenv("OLLAMA_EMBED_TRUNCATE", envvar_value)
@@ -174,7 +176,7 @@ def test_model_embed(
 def test_registered_models_when_ollama_is_down(mocker):
     client = Mock()
     client.list.side_effect = ConnectError("[Errno 111] Connection refused")
-    mocker.patch("llm_ollama.ollama.Client", return_value=client)
+    mocker.patch("ollama.Client", return_value=client)
     assert not any(isinstance(m.model, Ollama) for m in get_models_with_aliases())
 
 

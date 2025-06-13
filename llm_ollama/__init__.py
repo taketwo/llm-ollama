@@ -7,9 +7,8 @@ from typing import List, Optional, Tuple
 
 import click
 import llm
-import ollama
-from llm_ollama.auth import get_async_client, get_client
 
+from llm_ollama.auth import get_async_client, get_client
 from llm_ollama.cache import Cache
 
 from pydantic import Field, TypeAdapter, ValidationError
