@@ -19,29 +19,31 @@ llm install llm-ollama
 
 First, ensure that the Ollama server is running and that you have pulled some models. You can use `ollama list` to check what is locally available.
 
-The plugin will query the Ollama server for the list of models. You can use `llm ollama list-models` to see the list; it should be the same as output by `ollama list`. All these models will be automatically registered with LLM and made available for prompting, chatting, and embedding.
+The plugin will query the Ollama server for the list of models. You can use `llm ollama models` to see the list; it should be the same as output by `ollama list`. All these models will be automatically registered with LLM and made available for prompting, chatting, and embedding.
 
-Assuming you have `llama2:latest` available, you can run a prompt using:
+Assuming you have `llama3.2:latest` available, you can run a prompt using:
 
 ```bash
-llm -m llama2:latest 'How much is 2+2?'
+llm -m llama3.2:latest 'How much is 2+2?'
 ```
 
-The plugin automatically creates a short alias for models that have `:latest` in the name, so the previous command is equivalent to running:
+The plugin automatically creates a shorter alias for models that have `:latest` in the name, so the previous command is equivalent to running:
 
 ```bash
-llm -m llama2 'How much is 2+2?'
+llm -m llama3.2 'How much is 2+2?'
 ```
 
 To start an interactive chat session:
 
 ```bash
-llm chat -m llama2
+llm chat -m llama3.2
 ```
 ```
-Chatting with llama2:latest
+Chatting with llama3.2:latest
 Type 'exit' or 'quit' to exit
 Type '!multi' to enter multiple lines, then '!end' to finish
+Type '!edit' to open your default editor and modify the prompt
+Type '!fragment <my_fragment> [<another_fragment> ...]' to insert one or more fragments
 >
 ```
 
@@ -55,11 +57,10 @@ llm -m llava "Describe this image" -a https://static.simonwillison.net/static/20
 
 ### Tools
 
-Some models such as [Qwen 3](https://ollama.com/library/qwen3) support [tools](https://llm.datasette.io/en/stable/tools.html). Ollama have a [list of tool supporting models](https://ollama.com/search?c=tools).
-```bash
-ollama pull qwen3:4b
+Ollama models with [tools support](https://ollama.com/search?c=tools) can make use of [LLM tools](https://llm.datasette.io/en/stable/tools.html) passed to them:
 
-llm -m qwen3:4b -T llm_time 'What is the time?' --td
+```bash
+llm -m llama3.2 -T llm_time 'What is the time?' --td
 ```
 
 ### Embeddings
