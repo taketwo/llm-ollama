@@ -88,63 +88,45 @@ class _SharedOllama:
         See: https://github.com/ollama/ollama/blob/main/docs/modelfile.md#parameter
         """
 
-        mirostat: Optional[int] = Field(
-            default=None,
-            description=("Enable Mirostat sampling for controlling perplexity."),
-        )
-        mirostat_eta: Optional[float] = Field(
-            default=None,
-            description=(
-                "Influences how quickly the algorithm responds to feedback from the generated text."
-            ),
-        )
-        mirostat_tau: Optional[float] = Field(
-            default=None,
-            description=(
-                "Controls the balance between coherence and diversity of the output."
-            ),
-        )
         num_ctx: Optional[int] = Field(
             default=None,
-            description="The size of the context window used to generate the next token.",
+            description="Sets the size of the context window used to generate the next token. (Default: 2048)",
+        )
+        repeat_last_n: Optional[int] = Field(
+            default=None,
+            description="Sets how far back for the model to look back to prevent repetition. (Default: 64, 0 = disabled, -1 = num_ctx)",
+        )
+        repeat_penalty: Optional[float] = Field(
+            default=None,
+            description="Sets how strongly to penalize repetitions. A higher value (e.g., 1.5) will penalize repetitions more strongly, while a lower value (e.g., 0.9) will be more lenient. (Default: 1.1)",
         )
         temperature: Optional[float] = Field(
             default=None,
-            description=(
-                "The temperature of the model. Increasing the temperature will make the model answer more creatively."
-            ),
+            description="The temperature of the model. Increasing the temperature will make the model answer more creatively. (Default: 0.8)",
         )
         seed: Optional[int] = Field(
             default=None,
-            description=(
-                "Sets the random number seed to use for generation. Setting this to a specific number will make the model generate the same text for the same prompt."
-            ),
+            description="Sets the random number seed to use for generation. Setting this to a specific number will make the model generate the same text for the same prompt. (Default: 0)",
         )
         stop: Optional[List[str]] = Field(
             default=None,
-            description=(
-                "Sets the stop sequences to use. When this pattern is encountered the LLM will stop generating text and return."
-            ),
-        )
-        tfs_z: Optional[float] = Field(
-            default=None,
-            description=(
-                "Tail free sampling is used to reduce the impact of less probable tokens from the output."
-            ),
+            description="Sets the stop sequences to use. When this pattern is encountered the LLM will stop generating text and return.",
         )
         num_predict: Optional[int] = Field(
             default=None,
-            description=("Maximum number of tokens to predict when generating text."),
+            description="Maximum number of tokens to predict when generating text. (Default: -1, infinite generation)",
         )
         top_k: Optional[int] = Field(
             default=None,
-            description=("Reduces the probability of generating nonsense."),
+            description="Reduces the probability of generating nonsense. A higher value (e.g. 100) will give more diverse answers, while a lower value (e.g. 10) will be more conservative. (Default: 40)",
         )
         top_p: Optional[float] = Field(
             default=None,
-            description=(
-                "Works together with top-k. A higher value (e.g., 0.95) will lead to more diverse text, while a lower value (e.g., 0.5) will generate more focused and conservative text."
-            ),
+            description="Works together with top-k. A higher value (e.g., 0.95) will lead to more diverse text, while a lower value (e.g., 0.5) will generate more focused and conservative text. (Default: 0.9)",
+        )
+        min_p: Optional[float] = Field(
+            default=None,
+            description="Alternative to the top_p, and aims to ensure a balance of quality and variety. The parameter p represents the minimum probability for a token to be considered, relative to the probability of the most likely token. (Default: 0.0)",
         )
         json_object: Optional[bool] = Field(
             default=None,
