@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-from _pytest.fixtures import SubRequest
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -45,35 +44,43 @@ def pytest_configure(config: pytest.Config) -> None:
         )
 
 
-@pytest.fixture(autouse=True)
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Determine if integration tests should run.
+
+    The decision is based on command-line options and Ollama server availability.
+    """
+    if session.config.getoption("--no-integration"):
+        enabled = False
+    else:
+        enabled = True
+        try:
+            __import__("ollama").list()
+        except Exception as e:
+            if session.config.getoption("--integration"):
+                pytest.exit(
+                    f"Integration tests forced but Ollama discovery failed: {e}",
+                    1,
+                )
+            enabled = False
+
+    session.config._integration = {"enabled": enabled}
+
+
+def pytest_collection_modifyitems(
+    config: pytest.Config,
+    items: list[pytest.Item],
+) -> None:
+    """Skip integration tests if integration is disabled."""
+    if not config._integration["enabled"]:
+        skip_integration = pytest.mark.skip(reason="Integration tests disabled")
+        for item in items:
+            if "integration" in item.keywords:
+                item.add_marker(skip_integration)
+
+
+@pytest.fixture(autouse=False)
 def _isolated_cache(tmp_path: Path) -> None:
     """Set isolated cache directory for each test."""
     import llm_ollama
 
     llm_ollama.cache.set_dir(tmp_path / "test_cache")
-
-
-@pytest.fixture(autouse=True)
-def _check_ollama(request: SubRequest) -> None:
-    """Automatically check Ollama server availability for integration tests.
-
-    This fixture runs automatically for any test marked with @pytest.mark.integration.
-    It implements the following logic:
-        * If --no-integration specified: skip test
-        * If --integration specified: fail if Ollama server unavailable
-        * Otherwise: skip if Ollama server unavailable
-    """
-    if not request.node.get_closest_marker("integration"):
-        return
-
-    if request.config.getoption("--no-integration"):
-        pytest.skip("Integration tests disabled with --no-integration")
-
-    try:
-        __import__("ollama").list()
-    except Exception as e:
-        if request.config.getoption("--integration"):
-            raise RuntimeError(
-                "--integration specified but Ollama server not available",
-            ) from e
-        pytest.skip("Ollama server not available")
