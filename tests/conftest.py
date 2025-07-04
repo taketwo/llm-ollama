@@ -4,14 +4,7 @@ import pytest
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
-    """Add command-line options for integration test control.
-
-    Creates a separate option group for integration testing with two mutually exclusive
-    flags:
-
-        --integration     Force run integration tests, fail if Ollama server unavailable
-        --no-integration  Skip integration tests regardless of Ollama server status
-    """
+    """Add command-line options for integration test control."""
     group = parser.getgroup("integration")
     group.addoption(
         "--integration",
@@ -22,6 +15,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--no-integration",
         action="store_true",
         help="force disable integration tests",
+    )
+    group.addoption(
+        "--model",
+        action="store",
+        default="llama3.2",
+        help="specify a model to use for integration tests (has to be capable of completion and tool usage)",
     )
 
 
@@ -47,23 +46,32 @@ def pytest_configure(config: pytest.Config) -> None:
 def pytest_sessionstart(session: pytest.Session) -> None:
     """Determine if integration tests should run.
 
-    The decision is based on command-line options and Ollama server availability.
+    The decision is based on command-line options and availability of Ollama server
+    and necessary model(s).
     """
-    if session.config.getoption("--no-integration"):
-        enabled = False
-    else:
-        enabled = True
+    model = session.config.getoption("--model")
+    enabled = False
+    if not session.config.getoption("--no-integration"):
         try:
-            __import__("ollama").list()
+            models = __import__("ollama").list()["models"]
+            if any(model in m.model for m in models):
+                enabled = True
+            elif session.config.getoption("--integration"):
+                pytest.exit(
+                    f"Integration tests forced but model {model} is not available",
+                    1,
+                )
         except Exception as e:
             if session.config.getoption("--integration"):
                 pytest.exit(
                     f"Integration tests forced but Ollama discovery failed: {e}",
                     1,
                 )
-            enabled = False
 
-    session.config._integration = {"enabled": enabled}
+    session.config._integration = {
+        "enabled": enabled,
+        "model": model,
+    }
 
 
 def pytest_collection_modifyitems(
@@ -76,6 +84,18 @@ def pytest_collection_modifyitems(
         for item in items:
             if "integration" in item.keywords:
                 item.add_marker(skip_integration)
+
+
+@pytest.fixture(scope="session")
+def integration_config(pytestconfig: pytest.Config) -> dict:
+    """Get integration test configuration."""
+    return pytestconfig._integration
+
+
+@pytest.fixture(scope="session")
+def integration_model(integration_config: dict) -> str:
+    """Get name of a model to use for integration tests."""
+    return integration_config["model"]
 
 
 @pytest.fixture(autouse=False)

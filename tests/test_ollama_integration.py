@@ -7,9 +7,9 @@ from llm import get_async_model, get_model, schema_dsl
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_async_model_prompt():
-    """Tests actual run. Needs llama3.2"""
-    model = get_async_model("llama3.2:latest")
+async def test_async_model_prompt(integration_model):
+    """Tests actual run."""
+    model = get_async_model(integration_model)
     response = model.prompt("a short poem about tea")
     response_text = await response.text()
     assert len(response_text) > 0
@@ -17,9 +17,9 @@ async def test_async_model_prompt():
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_async_model_prompt_with_schema():
-    """Tests actual run. Needs llama3.2"""
-    model = get_async_model("llama3.2:latest")
+async def test_async_model_prompt_with_schema(integration_model):
+    """Tests actual run."""
+    model = get_async_model(integration_model)
     response = model.prompt(
         "Describe a nice dog with a surprising name",
         schema=schema_dsl("name, age int, bio"),
@@ -34,14 +34,14 @@ async def test_async_model_prompt_with_schema():
 
 
 @pytest.mark.integration
-def test_tools():
-    """Test tool execution. Needs llama3.2"""
+def test_tools(integration_model):
+    """Test tool execution."""
 
     def multiply(a: int, b: int):
         "Multiply two integers"
         return int(a) * int(b)
 
-    model = get_model("llama3.2:latest")
+    model = get_model(integration_model)
     chain = model.chain("12345 * 4312", tools=[multiply])
     result = chain.text()
     assert "53231640" in result or "53,231,640" in result
