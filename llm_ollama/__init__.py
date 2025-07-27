@@ -52,6 +52,7 @@ def register_models(register):
         if "completion" not in capabilities:
             continue
         supports_tools = "tools" in capabilities
+        supports_thinking = "thinking" in capabilities
         register(
             Ollama(name, supports_tools=supports_tools),
             AsyncOllama(name, supports_tools=supports_tools),
@@ -75,6 +76,7 @@ class _SharedOllama:
     can_stream: bool = True
     supports_schema: bool = True
     supports_tools: bool = True
+    supports_thinking: bool = False
     attachment_types = {
         "image/png",
         "image/jpeg",
@@ -132,14 +134,20 @@ class _SharedOllama:
             default=None,
             description="Output a valid JSON object {...}. Prompt must mention JSON.",
         )
+        think: Optional[bool] = Field(
+            default=None,
+            description="Enable the model's thinking process.",
+        )
 
     def __init__(
         self,
         model_id: str,
         supports_tools: bool = True,
+        supports_thinking: bool = False,
     ) -> None:
         self.model_id = model_id
         self.supports_tools = supports_tools
+        self.supports_thinking = supports_thinking
 
     def __str__(self) -> str:
         return f"Ollama: {self.model_id}"
@@ -209,9 +217,12 @@ class Ollama(_SharedOllama, llm.Model):
         messages = self.build_messages(prompt, conversation)
         response._prompt_json = {"messages": messages}
         options = prompt.options.model_dump(exclude_none=True)
+        think = options.pop("think", None)
         json_object = options.pop("json_object", None)
         kwargs = {}
         usage = None
+        if think is not None:
+            kwargs["think"] = think
         if json_object:
             kwargs["format"] = "json"
         elif prompt.schema:
@@ -289,9 +300,12 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
         response._prompt_json = {"messages": messages}
 
         options = prompt.options.model_dump(exclude_none=True)
+        think = options.pop("think", None)
         json_object = options.pop("json_object", None)
         kwargs = {}
         usage = None
+        if think is not None:
+            kwargs["think"] = think
         if json_object:
             kwargs["format"] = "json"
         elif prompt.schema:
