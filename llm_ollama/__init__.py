@@ -132,6 +132,10 @@ class _SharedOllama:
             default=None,
             description="Output a valid JSON object {...}. Prompt must mention JSON.",
         )
+        think: Optional[bool] = Field(
+            default=None,
+            description="Enable the model's thinking process.",
+        )
 
     def __init__(
         self,
@@ -209,9 +213,12 @@ class Ollama(_SharedOllama, llm.Model):
         messages = self.build_messages(prompt, conversation)
         response._prompt_json = {"messages": messages}
         options = prompt.options.model_dump(exclude_none=True)
+        think = options.pop("think", None)
         json_object = options.pop("json_object", None)
         kwargs = {}
         usage = None
+        if think is not None:
+            kwargs["think"] = think
         if json_object:
             kwargs["format"] = "json"
         elif prompt.schema:
@@ -289,9 +296,12 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
         response._prompt_json = {"messages": messages}
 
         options = prompt.options.model_dump(exclude_none=True)
+        think = options.pop("think", None)
         json_object = options.pop("json_object", None)
         kwargs = {}
         usage = None
+        if think is not None:
+            kwargs["think"] = think
         if json_object:
             kwargs["format"] = "json"
         elif prompt.schema:

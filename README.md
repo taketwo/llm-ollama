@@ -128,7 +128,10 @@ All models accept [Ollama modelfile parameters](https://github.com/ollama/ollama
 
 See the referenced page for the complete list with descriptions and default values.
 
-Additionally, the `-o json_object 1` option can be used to force the model to reply with a valid JSON object. Note that your prompt must mention JSON for this to work.
+Additionally, the -o flag supports plugin-specific options:
+
+- `-o json_object 1` forces the model to reply with a valid JSON object. Note that your prompt must mention JSON for this to work;
+- `-o think false` disables the intermediate reasoning step for thinking-capable models.
 
 ## Ollama server address
 
