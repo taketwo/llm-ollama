@@ -52,7 +52,6 @@ def register_models(register):
         if "completion" not in capabilities:
             continue
         supports_tools = "tools" in capabilities
-        supports_thinking = "thinking" in capabilities
         register(
             Ollama(name, supports_tools=supports_tools),
             AsyncOllama(name, supports_tools=supports_tools),
@@ -76,7 +75,6 @@ class _SharedOllama:
     can_stream: bool = True
     supports_schema: bool = True
     supports_tools: bool = True
-    supports_thinking: bool = False
     attachment_types = {
         "image/png",
         "image/jpeg",
@@ -143,11 +141,9 @@ class _SharedOllama:
         self,
         model_id: str,
         supports_tools: bool = True,
-        supports_thinking: bool = False,
     ) -> None:
         self.model_id = model_id
         self.supports_tools = supports_tools
-        self.supports_thinking = supports_thinking
 
     def __str__(self) -> str:
         return f"Ollama: {self.model_id}"
