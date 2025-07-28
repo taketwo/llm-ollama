@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 import pytest
 
@@ -50,8 +50,7 @@ class TestAuthentication:
         mock_client_class = request.getfixturevalue(mock_fixture)
 
         get_client_func()
-
-        mock_client_class.assert_called_once_with()
+        mock_client_class.assert_called_once_with(timeout=ANY)
 
     @parametrize_clients()
     def test_host_without_auth(
@@ -66,8 +65,9 @@ class TestAuthentication:
         mock_client_class = request.getfixturevalue(mock_fixture)
 
         get_client_func()
-
-        mock_client_class.assert_called_once_with(host="http://localhost:11434")
+        mock_client_class.assert_called_once_with(
+            host="http://localhost:11434", timeout=ANY
+        )
 
     @parametrize_clients()
     def test_host_with_auth(
@@ -90,6 +90,7 @@ class TestAuthentication:
         mock_client_class.assert_called_once_with(
             host="http://example.com:8080",
             auth=mock_auth_instance,
+            timeout=ANY,
         )
 
 
@@ -134,4 +135,5 @@ def test_various_auth_formats(
     mock_ollama_client.assert_called_once_with(
         host=expected_host,
         auth=mock_auth_instance,
+        timeout=ANY,
     )

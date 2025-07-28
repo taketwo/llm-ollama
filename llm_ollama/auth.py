@@ -7,6 +7,13 @@ from urllib.parse import unquote, urlparse
 import httpx
 import ollama
 
+# Timeout configuration for Ollama HTTP clients
+# - No overall timeout (None) allows slow models/hardware to generate responses
+# - Short connect timeout (1s) quickly fails when Ollama host is unreachable
+# Ref: https://github.com/taketwo/llm-ollama/issues/52
+DEFAULT_REQUEST_TIMEOUT = None
+CONNECT_TIMEOUT = 1.0
+
 
 def get_client() -> ollama.Client:
     """Create an Ollama client with host and authentication set based on OLLAMA_HOST."""
@@ -57,7 +64,9 @@ def _parse_auth_from_env() -> Tuple[Optional[str], Optional[httpx.BasicAuth]]:
 def _create_client(client_class):
     """Create a client with host and authentication set based on OLLAMA_HOST."""
     host, auth = _parse_auth_from_env()
-    kwargs = {}
+    kwargs = {
+        "timeout": httpx.Timeout(DEFAULT_REQUEST_TIMEOUT, connect=CONNECT_TIMEOUT),
+    }
     if host:
         kwargs["host"] = host
     if auth:
