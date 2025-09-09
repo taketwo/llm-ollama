@@ -49,7 +49,6 @@ class TestAuthentication:
         monkeypatch.delenv("OLLAMA_HOST", raising=False)
         mock_client_class = request.getfixturevalue(mock_fixture)
         get_client_func()
-
         mock_client_class.assert_called_once_with(timeout=ANY)
 
     @parametrize_clients()
