@@ -156,7 +156,7 @@ The plugin will parse the credentials and use them for authentication. Special c
 export OLLAMA_HOST=https://user%40domain:p%40ssw0rd@192.168.1.13:11434
 ```
 
-If your Ollama server is exposed behind a reverse proxy with another security mechanism in place, you can attach custom headers to the requests by setting the `OLLAMA_HEADERS` environment variable to a comma-delimited group of key-value pairs, e.g.
+If your Ollama server is exposed behind a reverse proxy with another security mechanism in place, you can attach custom HTTP headers to the requests by setting the `OLLAMA_HEADERS` environment variable to a comma-delimited group of key-value pairs, e.g. `OLLAMA_HEADERS='key1=value1,key2=value2'`
 
 JWT Token Auth, for deployments like Open-WebUI's Ollama endpoint:
 ```bash
