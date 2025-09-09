@@ -76,7 +76,7 @@ def _parse_headers_from_env() -> Optional[dict[str, str]]:
         return None
 
 def _parse_auth_from_env() -> Tuple[str, Optional[httpx.BasicAuth], Optional[dict[str, str]]]:
-    """Parse OLLAMA_HOST environment variable and extract credentials if present."""
+    """Parse OLLAMA_HOST environment variable and extract credentials and custom headers if present."""
     host = os.getenv("OLLAMA_HOST")
     if host is None:
         host = "http://localhost:11434"
