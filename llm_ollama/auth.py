@@ -1,7 +1,7 @@
 """Authentication functionality for Ollama clients."""
 
 import os
-from typing import Optional, Tuple
+from typing import NotRequired, Optional, Tuple, Type, TypeVar, Union, TypedDict
 from urllib.parse import unquote, urlparse
 
 import httpx
@@ -14,6 +14,7 @@ import ollama
 DEFAULT_REQUEST_TIMEOUT = None
 CONNECT_TIMEOUT = 1.0
 
+T = TypeVar("T", bound=Union[ollama.Client, ollama.AsyncClient])
 
 def get_client() -> ollama.Client:
     """Create an Ollama client with host and authentication set based on OLLAMA_HOST."""
@@ -57,15 +58,17 @@ def _parse_auth_from_env() -> Tuple[Optional[str], Optional[httpx.BasicAuth]]:
     """Parse OLLAMA_HOST environment variable and extract credentials if present."""
     host = os.getenv("OLLAMA_HOST")
     if not host:
-        return None, None
-    return _parse_auth_from_url(host)
-
+class ClientParams(TypedDict):
+    host: str
+    timeout: NotRequired[httpx.Timeout]
+    auth: NotRequired[httpx.Auth]
 
 def _create_client(client_class):
     """Create a client with host and authentication set based on OLLAMA_HOST."""
     host, auth = _parse_auth_from_env()
-    kwargs = {
+    kwargs: ClientParams = {
         "timeout": httpx.Timeout(DEFAULT_REQUEST_TIMEOUT, connect=CONNECT_TIMEOUT),
+        "host": host
     }
     if host:
         kwargs["host"] = host
