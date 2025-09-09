@@ -48,10 +48,9 @@ class TestAuthentication:
         """Test client creation when OLLAMA_HOST is not set."""
         monkeypatch.delenv("OLLAMA_HOST", raising=True)
         mock_client_class = request.getfixturevalue(mock_fixture)
-        with pytest.raises(ValueError):
-            get_client_func()
+        get_client_func()
 
-            mock_client_class.assert_called_once_with(timeout=ANY)
+        mock_client_class.assert_called_once_with(timeout=ANY)
 
     @parametrize_clients()
     def test_host_without_auth(

@@ -79,7 +79,7 @@ def _parse_auth_from_env() -> Tuple[str, Optional[httpx.BasicAuth], Optional[dic
     """Parse OLLAMA_HOST environment variable and extract credentials if present."""
     host = os.getenv("OLLAMA_HOST")
     if not host:
-        raise ValueError("OLLAMA_HOST environment variable must be set to use the llm_ollama plugin.")
+        host = "http://localhost:11434"
     host, auth = _parse_auth_from_url(host)
     headers = _parse_headers_from_env()
 
