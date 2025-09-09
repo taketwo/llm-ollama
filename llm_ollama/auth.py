@@ -53,25 +53,55 @@ def _parse_auth_from_url(url: str) -> Tuple[str, Optional[httpx.BasicAuth]]:
         netloc = f"{netloc}:{parsed.port}"
     return parsed._replace(netloc=netloc).geturl(), auth
 
+def _parse_headers_from_env() -> Optional[dict[str, str]]:
+    """
+    Parses the headers to pass to Ollama in a comma-separated string - e.g.
 
-def _parse_auth_from_env() -> Tuple[Optional[str], Optional[httpx.BasicAuth]]:
+    OLLAMA_HEADERS='Authorization=Bearer TOKEN,User-Agent=ollama-client'
+
+    Flexible approach to allow settting HTTP headers from a variety of deployment environments - Ollama
+    behind OpenWebUI with an auth token, Cloudflare tunnel with a service token, etc.
+    """
+
+    raw_headers = os.getenv("OLLAMA_HEADERS")
+    if raw_headers is not None:
+        collector: dict[str, str] = {}
+        headers = raw_headers.split(",")
+        for pair in headers:
+            key, value = pair.split("=")
+            collector[key] = value
+        return collector
+        
+    else:
+        return None
+
+def _parse_auth_from_env() -> Tuple[str, Optional[httpx.BasicAuth], Optional[dict[str, str]]]:
     """Parse OLLAMA_HOST environment variable and extract credentials if present."""
     host = os.getenv("OLLAMA_HOST")
     if not host:
+        raise ValueError("OLLAMA_HOST environment variable must be set to use the llm_ollama plugin.")
+    host, auth = _parse_auth_from_url(host)
+    headers = _parse_headers_from_env()
+
+    return host, auth, headers
+
+
 class ClientParams(TypedDict):
     host: str
     timeout: NotRequired[httpx.Timeout]
     auth: NotRequired[httpx.Auth]
+    headers: NotRequired[dict[str, str]]
 
-def _create_client(client_class):
+
+def _create_client(client_class: Type[T]):
     """Create a client with host and authentication set based on OLLAMA_HOST."""
-    host, auth = _parse_auth_from_env()
+    host, auth, headers = _parse_auth_from_env()
     kwargs: ClientParams = {
         "timeout": httpx.Timeout(DEFAULT_REQUEST_TIMEOUT, connect=CONNECT_TIMEOUT),
         "host": host
     }
-    if host:
-        kwargs["host"] = host
     if auth:
         kwargs["auth"] = auth
+    if headers:
+        kwargs["headers"] = headers
     return client_class(**kwargs)
