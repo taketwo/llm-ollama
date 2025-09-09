@@ -46,11 +46,12 @@ class TestAuthentication:
         monkeypatch,
     ):
         """Test client creation when OLLAMA_HOST is not set."""
-        monkeypatch.delenv("OLLAMA_HOST", raising=False)
+        monkeypatch.delenv("OLLAMA_HOST", raising=True)
         mock_client_class = request.getfixturevalue(mock_fixture)
+        with pytest.raises(ValueError):
+            get_client_func()
 
-        get_client_func()
-        mock_client_class.assert_called_once_with(timeout=ANY)
+            mock_client_class.assert_called_once_with(timeout=ANY)
 
     @parametrize_clients()
     def test_host_without_auth(
@@ -67,6 +68,19 @@ class TestAuthentication:
         get_client_func()
         mock_client_class.assert_called_once_with(
             host="http://localhost:11434", timeout=ANY
+        )
+
+    @parametrize_clients()
+    def test_host_with_custom_headers(self, get_client_func, mock_fixture, request, monkeypatch):
+        ollama_headers = {"Authorization": "Bearer TOKEN"}
+        monkeypatch.setenv("OLLAMA_HOST", "http://localhost:11434")
+        monkeypatch.setenv("OLLAMA_HEADERS", ",".join(["=".join(item) for item in ollama_headers.items()]))
+        mock_client_class = request.getfixturevalue(mock_fixture)
+        get_client_func()
+        mock_client_class.assert_called_once_with(
+            host="http://localhost:11434",
+            headers=ollama_headers,
+            timeout=ANY,
         )
 
     @parametrize_clients()
