@@ -46,7 +46,7 @@ class TestAuthentication:
         monkeypatch,
     ):
         """Test client creation when OLLAMA_HOST is not set."""
-        monkeypatch.delenv("OLLAMA_HOST", raising=True)
+        monkeypatch.delenv("OLLAMA_HOST", raising=False)
         mock_client_class = request.getfixturevalue(mock_fixture)
         get_client_func()
 
