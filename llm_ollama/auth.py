@@ -1,7 +1,7 @@
 """Authentication functionality for Ollama clients."""
 
 import os
-from typing import NotRequired, Optional, Tuple, Type, TypeVar, Union, TypedDict
+from typing import NotRequired, Optional, Tuple, Type, TypedDict, TypeVar, Union
 from urllib.parse import unquote, urlparse
 
 import httpx
@@ -15,6 +15,7 @@ DEFAULT_REQUEST_TIMEOUT = None
 CONNECT_TIMEOUT = 1.0
 
 T = TypeVar("T", bound=Union[ollama.Client, ollama.AsyncClient])
+
 
 def get_client() -> ollama.Client:
     """Create an Ollama client with host and authentication set based on OLLAMA_HOST."""
@@ -53,6 +54,7 @@ def _parse_auth_from_url(url: str) -> Tuple[str, Optional[httpx.BasicAuth]]:
         netloc = f"{netloc}:{parsed.port}"
     return parsed._replace(netloc=netloc).geturl(), auth
 
+
 def _parse_headers_from_env() -> Optional[dict[str, str]]:
     """
     Parses the headers to pass to Ollama in a comma-separated string - e.g.
@@ -71,11 +73,14 @@ def _parse_headers_from_env() -> Optional[dict[str, str]]:
             key, value = pair.split("=")
             collector[key] = value
         return collector
-        
+
     else:
         return None
 
-def _parse_auth_from_env() -> Tuple[Optional[str], Optional[httpx.BasicAuth], Optional[dict[str, str]]]:
+
+def _parse_auth_from_env() -> Tuple[
+    Optional[str], Optional[httpx.BasicAuth], Optional[dict[str, str]]
+]:
     """Parse OLLAMA_HOST environment variable and extract credentials and custom headers if present."""
     host = os.getenv("OLLAMA_HOST")
     auth = None
