@@ -27,6 +27,5 @@ include = ["llm_ollama*"]
 
 [dependency-groups]
 dev = [
-    "black>=25.1.0",
     "typing-extensions>=4.15.0",
 ]
