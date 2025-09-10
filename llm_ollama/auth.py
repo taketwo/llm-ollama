@@ -1,11 +1,14 @@
 """Authentication functionality for Ollama clients."""
 
 import os
-from typing import NotRequired, Optional, Tuple, Type, TypedDict, TypeVar, Union
+from typing import Optional, Tuple, Type, TypedDict, TypeVar, Union, TYPE_CHECKING
 from urllib.parse import unquote, urlparse
 
 import httpx
 import ollama
+
+if TYPE_CHECKING:
+    from typing_extensions import NotRequired
 
 # Timeout configuration for Ollama HTTP clients
 # - No overall timeout (None) allows slow models/hardware to generate responses
@@ -92,10 +95,10 @@ def _parse_auth_from_env() -> (
 
 
 class ClientParams(TypedDict):
-    host: NotRequired[str]
-    timeout: NotRequired[httpx.Timeout]
-    auth: NotRequired[httpx.Auth]
-    headers: NotRequired[dict[str, str]]
+    host: "NotRequired[str]"
+    timeout: "NotRequired[httpx.Timeout]"
+    auth: "NotRequired[httpx.Auth]"
+    headers: "NotRequired[dict[str, str]]"
 
 
 def _create_client(client_class: Type[T]):
