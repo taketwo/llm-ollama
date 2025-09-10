@@ -75,19 +75,19 @@ def _parse_headers_from_env() -> Optional[dict[str, str]]:
     else:
         return None
 
-def _parse_auth_from_env() -> Tuple[str, Optional[httpx.BasicAuth], Optional[dict[str, str]]]:
+def _parse_auth_from_env() -> Tuple[Optional[str], Optional[httpx.BasicAuth], Optional[dict[str, str]]]:
     """Parse OLLAMA_HOST environment variable and extract credentials and custom headers if present."""
     host = os.getenv("OLLAMA_HOST")
-    if host is None:
-        host = "http://localhost:11434"
-    host, auth = _parse_auth_from_url(host)
+    auth = None
+    if host is not None:
+        host, auth = _parse_auth_from_url(host)
     headers = _parse_headers_from_env()
 
     return host, auth, headers
 
 
 class ClientParams(TypedDict):
-    host: str
+    host: NotRequired[str]
     timeout: NotRequired[httpx.Timeout]
     auth: NotRequired[httpx.Auth]
     headers: NotRequired[dict[str, str]]
@@ -97,11 +97,12 @@ def _create_client(client_class: Type[T]):
     """Create a client with host and authentication set based on OLLAMA_HOST."""
     host, auth, headers = _parse_auth_from_env()
     kwargs: ClientParams = {
-        "timeout": httpx.Timeout(DEFAULT_REQUEST_TIMEOUT, connect=CONNECT_TIMEOUT),
-        "host": host
+        "timeout": httpx.Timeout(DEFAULT_REQUEST_TIMEOUT, connect=CONNECT_TIMEOUT)
     }
-    if auth:
+    if host is not None:
+        kwargs["host"] = host
+    if auth is not None:
         kwargs["auth"] = auth
-    if headers:
+    if headers is not None:
         kwargs["headers"] = headers
     return client_class(**kwargs)
