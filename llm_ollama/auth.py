@@ -70,10 +70,18 @@ def _parse_headers_from_env() -> Optional[dict[str, str]]:
 
     raw_headers = os.getenv("OLLAMA_HEADERS")
     if raw_headers is not None:
+        if raw_headers == "":
+            return {}
+
         collector: dict[str, str] = {}
         headers = raw_headers.split(",")
         for pair in headers:
-            key, value = pair.split("=")
+            if "=" not in pair:
+                raise ValueError(
+                    f"Invalid OLLAMA_HEADERS format: '{pair}' is missing '=' separator. "
+                    f"Expected format: 'key1=value1,key2=value2'"
+                )
+            key, value = pair.split("=", 1)
             collector[key] = value
         return collector
 
