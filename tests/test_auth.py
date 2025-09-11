@@ -50,7 +50,7 @@ class TestAuthentication:
         monkeypatch.delenv("OLLAMA_HEADERS", raising=False)
         mock_client_class = request.getfixturevalue(mock_fixture)
         get_client_func()
-        mock_client_class.assert_called_once_with(timeout=ANY)
+        mock_client_class.assert_called_once_with(timeout=ANY, headers={})
 
     @parametrize_clients()
     def test_host_without_auth(
@@ -67,6 +67,7 @@ class TestAuthentication:
         get_client_func()
         mock_client_class.assert_called_once_with(
             host="http://localhost:11434",
+            headers={},
             timeout=ANY,
         )
 
@@ -92,6 +93,7 @@ class TestAuthentication:
         mock_client_class.assert_called_once_with(
             host="http://example.com:8080",
             auth=mock_auth_instance,
+            headers={},
             timeout=ANY,
         )
 
@@ -160,6 +162,7 @@ def test_various_auth_formats(
     mock_ollama_client.assert_called_once_with(
         host=expected_host,
         auth=mock_auth_instance,
+        headers={},
         timeout=ANY,
     )
 
@@ -200,6 +203,6 @@ def test_various_headers(
     else:
         get_client()
         mock_ollama_client.assert_called_once_with(
-            headers=expected_headers,
             timeout=ANY,
+            headers=expected_headers,
         )
