@@ -47,6 +47,7 @@ class TestAuthentication:
     ):
         """Test client creation when OLLAMA_HOST is not set."""
         monkeypatch.delenv("OLLAMA_HOST", raising=False)
+        monkeypatch.delenv("OLLAMA_HEADERS", raising=False)
         mock_client_class = request.getfixturevalue(mock_fixture)
         get_client_func()
         mock_client_class.assert_called_once_with(timeout=ANY)
@@ -61,28 +62,11 @@ class TestAuthentication:
     ):
         """Test client creation with host but without authentication."""
         monkeypatch.setenv("OLLAMA_HOST", "http://localhost:11434")
-        mock_client_class = request.getfixturevalue(mock_fixture)
-
-        get_client_func()
-        mock_client_class.assert_called_once_with(
-            host="http://localhost:11434", timeout=ANY
-        )
-
-    @parametrize_clients()
-    def test_host_with_custom_headers(
-        self, get_client_func, mock_fixture, request, monkeypatch
-    ):
-        ollama_headers = {"Authorization": "Bearer TOKEN"}
-        monkeypatch.setenv("OLLAMA_HOST", "http://localhost:11434")
-        monkeypatch.setenv(
-            "OLLAMA_HEADERS",
-            ",".join(["=".join(item) for item in ollama_headers.items()]),
-        )
+        monkeypatch.delenv("OLLAMA_HEADERS", raising=False)
         mock_client_class = request.getfixturevalue(mock_fixture)
         get_client_func()
         mock_client_class.assert_called_once_with(
             host="http://localhost:11434",
-            headers=ollama_headers,
             timeout=ANY,
         )
 
@@ -97,6 +81,7 @@ class TestAuthentication:
     ):
         """Test client creation with host and authentication."""
         monkeypatch.setenv("OLLAMA_HOST", "http://user:pass@example.com:8080")
+        monkeypatch.delenv("OLLAMA_HEADERS", raising=False)
         mock_client_class = request.getfixturevalue(mock_fixture)
         mock_auth_instance = Mock()
         mock_basic_auth.return_value = mock_auth_instance
@@ -110,9 +95,31 @@ class TestAuthentication:
             timeout=ANY,
         )
 
+    @parametrize_clients()
+    def test_host_and_headers(
+        self,
+        get_client_func,
+        mock_fixture,
+        request,
+        monkeypatch,
+    ):
+        ollama_headers = {"Authorization": "Bearer TOKEN"}
+        monkeypatch.setenv("OLLAMA_HOST", "http://example.com:8080")
+        monkeypatch.setenv(
+            "OLLAMA_HEADERS",
+            ",".join(["=".join(item) for item in ollama_headers.items()]),
+        )
+        mock_client_class = request.getfixturevalue(mock_fixture)
+        get_client_func()
+        mock_client_class.assert_called_once_with(
+            host="http://example.com:8080",
+            headers=ollama_headers,
+            timeout=ANY,
+        )
+
 
 @pytest.mark.parametrize(
-    ("host_url", "expected_host", "expected_user", "expected_pass"),
+    ("host_env", "expected_host", "expected_user", "expected_pass"),
     [
         ("http://user:pass@localhost:11434", "http://localhost:11434", "user", "pass"),
         (
@@ -130,7 +137,7 @@ class TestAuthentication:
     ],
 )
 def test_various_auth_formats(
-    host_url,
+    host_env,
     expected_host,
     expected_user,
     expected_pass,
@@ -139,7 +146,8 @@ def test_various_auth_formats(
     monkeypatch,
 ):
     """Test parsing various URL formats with authentication."""
-    monkeypatch.setenv("OLLAMA_HOST", host_url)
+    monkeypatch.delenv("OLLAMA_HEADERS", raising=False)
+    monkeypatch.setenv("OLLAMA_HOST", host_env)
     mock_auth_instance = Mock()
     mock_basic_auth.return_value = mock_auth_instance
 
@@ -154,3 +162,44 @@ def test_various_auth_formats(
         auth=mock_auth_instance,
         timeout=ANY,
     )
+
+
+@pytest.mark.parametrize(
+    ("headers_env", "expected_headers"),
+    [
+        ("", {}),
+        ("Authorization=Bearer TOKEN", {"Authorization": "Bearer TOKEN"}),
+        (
+            "Authorization=Bearer TOKEN,User-Agent=ollama-client",
+            {"Authorization": "Bearer TOKEN", "User-Agent": "ollama-client"},
+        ),
+        (
+            "X-API-Key=secret,Content-Type=application/json",
+            {"X-API-Key": "secret", "Content-Type": "application/json"},
+        ),
+        (
+            "Header With Spaces=value,Another-Header=another value",
+            {"Header With Spaces": "value", "Another-Header": "another value"},
+        ),
+        ("Authorization:Bearer TOKEN", ValueError),
+    ],
+)
+def test_various_headers(
+    headers_env,
+    expected_headers,
+    mock_ollama_client,
+    monkeypatch,
+):
+    """Test parsing various OLLAMA_HEADERS."""
+    monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    monkeypatch.setenv("OLLAMA_HEADERS", headers_env)
+
+    if expected_headers is ValueError:
+        with pytest.raises(ValueError, match="Invalid OLLAMA_HEADERS format"):
+            get_client()
+    else:
+        get_client()
+        mock_ollama_client.assert_called_once_with(
+            headers=expected_headers,
+            timeout=ANY,
+        )
