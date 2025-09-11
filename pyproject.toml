@@ -24,3 +24,8 @@ lint = ["black"]
 
 [tool.setuptools.packages.find]
 include = ["llm_ollama*"]
+
+[dependency-groups]
+dev = [
+    "typing-extensions>=4.15.0",
+]
