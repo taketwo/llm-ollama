@@ -58,67 +58,52 @@ def _parse_auth_from_url(url: str) -> Tuple[str, Optional[httpx.BasicAuth]]:
     return parsed._replace(netloc=netloc).geturl(), auth
 
 
-def _parse_headers_from_env() -> Optional[dict[str, str]]:
+def _parse_headers_from_env() -> dict[str, str]:
+    """Parse OLLAMA_HEADERS environment variable to extract custom HTTP headers.
+
+    The variable should either be unset/empty, or contain a comma-separated list of
+    key=value pairs. Malformed entries will raise a ValueError.
+
     """
-    Parses the headers to pass to Ollama in a comma-separated string - e.g.
-
-    OLLAMA_HEADERS='Authorization=Bearer TOKEN,User-Agent=ollama-client'
-
-    Flexible approach to allow settting HTTP headers from a variety of deployment environments - Ollama
-    behind OpenWebUI with an auth token, Cloudflare tunnel with a service token, etc.
-    """
-
     raw_headers = os.getenv("OLLAMA_HEADERS")
-    if raw_headers is not None:
-        if raw_headers == "":
-            return {}
-
-        collector: dict[str, str] = {}
-        headers = raw_headers.split(",")
-        for pair in headers:
+    collector: dict[str, str] = {}
+    if raw_headers:
+        for pair in raw_headers.split(","):
             if "=" not in pair:
                 raise ValueError(
                     f"Invalid OLLAMA_HEADERS format: '{pair}' is missing '=' separator. "
-                    f"Expected format: 'key1=value1,key2=value2'"
+                    f"Expected format: 'key1=value1,key2=value2'",
                 )
             key, value = pair.split("=", 1)
             collector[key] = value
-        return collector
-
-    else:
-        return None
+    return collector
 
 
-def _parse_auth_from_env() -> (
-    Tuple[Optional[str], Optional[httpx.BasicAuth], Optional[dict[str, str]]]
-):
-    """Parse OLLAMA_HOST environment variable and extract credentials and custom headers if present."""
+def _parse_auth_from_env() -> Tuple[Optional[str], Optional[httpx.BasicAuth]]:
+    """Parse OLLAMA_HOST environment variable and extract credentials."""
     host = os.getenv("OLLAMA_HOST")
     auth = None
     if host is not None:
         host, auth = _parse_auth_from_url(host)
-    headers = _parse_headers_from_env()
-
-    return host, auth, headers
+    return host, auth
 
 
 class ClientParams(TypedDict):
     host: "NotRequired[str]"
     timeout: "NotRequired[httpx.Timeout]"
     auth: "NotRequired[httpx.Auth]"
-    headers: "NotRequired[dict[str, str]]"
+    headers: "dict[str, str]"
 
 
 def _create_client(client_class: Type[T]):
-    """Create a client with host and authentication set based on OLLAMA_HOST."""
-    host, auth, headers = _parse_auth_from_env()
+    """Create a client with host, authentication, and headers set based on environment variables."""
+    host, auth = _parse_auth_from_env()
     kwargs: ClientParams = {
-        "timeout": httpx.Timeout(DEFAULT_REQUEST_TIMEOUT, connect=CONNECT_TIMEOUT)
+        "timeout": httpx.Timeout(DEFAULT_REQUEST_TIMEOUT, connect=CONNECT_TIMEOUT),
+        "headers": _parse_headers_from_env(),
     }
     if host is not None:
         kwargs["host"] = host
     if auth is not None:
         kwargs["auth"] = auth
-    if headers is not None:
-        kwargs["headers"] = headers
     return client_class(**kwargs)
