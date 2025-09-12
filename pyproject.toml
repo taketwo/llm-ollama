@@ -1,7 +1,7 @@
 [project]
 name = "llm-ollama"
 version = "0.13.0"
-description = "LLM plugin providing access to local Ollama models"
+description = "LLM plugin providing access to models running on an Ollama server"
 readme = "README.md"
 authors = [{ name = "Sergey Alexandrov" }]
 license = { text = "Apache-2.0" }
