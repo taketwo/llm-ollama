@@ -200,7 +200,9 @@ To test or lint the code, first activate the environment:
 source .venv/bin/activate
 ```
 
-To run unit and integration tests:
+The environment includes `llm`; it will pick up the local version of the plugin, which is useful for manual testing.
+
+To run automated unit and integration tests:
 
 ```bash
 python -m pytest
