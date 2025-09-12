@@ -20,12 +20,10 @@ ollama = "llm_ollama"
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-asyncio", "pytest-mock"]
-lint = ["black"]
+lint = ["ruff"]
 
 [tool.setuptools.packages.find]
 include = ["llm_ollama*"]
 
 [dependency-groups]
-dev = [
-    "typing-extensions>=4.15.0",
-]
+dev = ["typing-extensions>=4.15.0"]

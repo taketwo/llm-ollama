@@ -215,5 +215,5 @@ Integration tests require a running Ollama server and will be:
 To format the code:
 
 ```bash
-python -m black .
+python -m ruff format .
 ```

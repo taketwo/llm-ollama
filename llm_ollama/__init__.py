@@ -6,11 +6,10 @@ from typing import List, Optional, Tuple
 
 import llm
 from llm.utils import dicts_to_table_string
+from pydantic import Field, TypeAdapter, ValidationError
 
 from llm_ollama.auth import get_async_client, get_client
 from llm_ollama.cache import Cache
-
-from pydantic import Field, TypeAdapter, ValidationError
 
 cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
 
