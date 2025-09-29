@@ -17,22 +17,36 @@ cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
 @llm.hookimpl
 def register_tools(register):
     """Register Ollama web search tools so LLM can execute them."""
+    # Set API key from LLM's key store if not already in environment
+    # This must happen before creating the Ollama client
+    import os
+    if not os.environ.get("OLLAMA_API_KEY"):
+        try:
+            key = llm.get_key("", "ollama", "OLLAMA_API_KEY")
+            if key:
+                os.environ["OLLAMA_API_KEY"] = key
+        except Exception:
+            pass  # Key not found, will rely on environment variable
+
     try:
-        from ollama import web_search as ollama_web_search, web_fetch as ollama_web_fetch
+        from ollama import Client
     except ImportError:
         return
+
+    # Create a client instance that will use the API key from environment
+    client = Client()
 
     # Wrapper functions that call Ollama's web search
     def search_impl(query, max_results=5):
         try:
-            result = ollama_web_search(query=query, max_results=max_results)
+            result = client.web_search(query=query, max_results=max_results)
             return str(result)
         except Exception as e:
             return f"Error performing web search: {str(e)}"
 
     def fetch_impl(url):
         try:
-            result = ollama_web_fetch(url=url)
+            result = client.web_fetch(url=url)
             return str(result)
         except Exception as e:
             return f"Error fetching URL: {str(e)}"

@@ -86,13 +86,29 @@ llm -m llama3.2 --schema "name, age int, one_sentence_bio" "invent a cool dog"
 The plugin registers `web_search` and `web_fetch` tools that Ollama models can use to search the web and retrieve web page contents.
 
 To use web search, you need:
-1. An Ollama API key - set `OLLAMA_API_KEY` environment variable (sign up at https://ollama.com/signup)
+1. An Ollama API key (sign up at https://ollama.com/signup)
 2. A model that supports tools (see https://ollama.com/search?c=tools)
 
-Example usage:
+#### Setting up your API key
+
+You can provide your Ollama API key in two ways:
+
+**Option 1: Using LLM's key management (recommended)**
+
+```bash
+llm keys set ollama
+# Paste your API key when prompted
+```
+
+**Option 2: Using an environment variable**
 
 ```bash
 export OLLAMA_API_KEY=your_api_key
+```
+
+#### Example usage
+
+```bash
 llm -m qwen3:4b -T web_search -T web_fetch "What is ollama's new engine?"
 ```
 
