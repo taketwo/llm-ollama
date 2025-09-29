@@ -81,6 +81,23 @@ Ollama's built-in support for [structured outputs](https://ollama.com/blog/struc
 llm -m llama3.2 --schema "name, age int, one_sentence_bio" "invent a cool dog"
 ```
 
+### Web search
+
+The plugin registers `web_search` and `web_fetch` tools that Ollama models can use to search the web and retrieve web page contents.
+
+To use web search, you need:
+1. An Ollama API key - set `OLLAMA_API_KEY` environment variable (sign up at https://ollama.com/signup)
+2. A model that supports tools (see https://ollama.com/search?c=tools)
+
+Example usage:
+
+```bash
+export OLLAMA_API_KEY=your_api_key
+llm -m qwen3:4b -T web_search -T web_fetch "What is ollama's new engine?"
+```
+
+The model will automatically decide when to use web search to answer your question and will fetch relevant web pages as needed.
+
 ### Async models
 
 The plugin registers [async LLM models](https://llm.datasette.io/en/stable/python-api.html#async-models) suitable for use with Python [asyncio](https://docs.python.org/3/library/asyncio.html).

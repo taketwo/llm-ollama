@@ -15,6 +15,65 @@ cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
 
 
 @llm.hookimpl
+def register_tools(register):
+    """Register Ollama web search tools so LLM can execute them."""
+    try:
+        from ollama import web_search as ollama_web_search, web_fetch as ollama_web_fetch
+    except ImportError:
+        return
+
+    # Wrapper functions that call Ollama's web search
+    def search_impl(query, max_results=5):
+        try:
+            result = ollama_web_search(query=query, max_results=max_results)
+            return str(result)
+        except Exception as e:
+            return f"Error performing web search: {str(e)}"
+
+    def fetch_impl(url):
+        try:
+            result = ollama_web_fetch(url=url)
+            return str(result)
+        except Exception as e:
+            return f"Error fetching URL: {str(e)}"
+
+    # Register as LLM tools
+    register(
+        llm.Tool(
+            name="web_search",
+            description="Search the web for information",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "The search query"},
+                    "max_results": {
+                        "type": "integer",
+                        "description": "Maximum number of results (default 5, max 10)",
+                        "default": 5,
+                    },
+                },
+                "required": ["query"],
+            },
+            implementation=search_impl,
+        )
+    )
+    register(
+        llm.Tool(
+            name="web_fetch",
+            description="Fetch the contents of a web page",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "The URL to fetch"}
+                },
+                "required": ["url"],
+            },
+            implementation=fetch_impl,
+        )
+    )
+
+
+@llm.hookimpl
 def register_commands(cli):
     @cli.group(name="ollama")
     def ollama_group() -> None:
@@ -223,9 +282,18 @@ class Ollama(_SharedOllama, llm.Model):
         elif prompt.schema:
             kwargs["format"] = prompt.schema
         if prompt.tools:
-            kwargs["tools"] = [
-                tool.implementation for tool in prompt.tools if tool.implementation
-            ]
+            # Convert LLM tools to Ollama format
+            ollama_tools = []
+            for tool in prompt.tools:
+                ollama_tools.append({
+                    "type": "function",
+                    "function": {
+                        "name": tool.name,
+                        "description": tool.description or "",
+                        "parameters": tool.input_schema,
+                    }
+                })
+            kwargs["tools"] = ollama_tools
         if stream:
             response_stream = get_client().chat(
                 model=self.model_id,
@@ -305,6 +373,19 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
             kwargs["format"] = "json"
         elif prompt.schema:
             kwargs["format"] = prompt.schema
+        if prompt.tools:
+            # Convert LLM tools to Ollama format
+            ollama_tools = []
+            for tool in prompt.tools:
+                ollama_tools.append({
+                    "type": "function",
+                    "function": {
+                        "name": tool.name,
+                        "description": tool.description or "",
+                        "parameters": tool.input_schema,
+                    }
+                })
+            kwargs["tools"] = ollama_tools
 
         try:
             if stream:
