@@ -36,12 +36,11 @@ def register_tools(register):
     client = get_client()
 
     # Register Ollama's web search tools using the authenticated client's methods
-    # These are already in Ollama's expected format
+    # Ollama will auto-generate schemas from the callable signatures
     register(
         llm.Tool(
             name="web_search",
             description="Search the web for information",
-            input_schema=None,
             implementation=client.web_search,
         )
     )
@@ -49,7 +48,6 @@ def register_tools(register):
         llm.Tool(
             name="web_fetch",
             description="Fetch the contents of a web page",
-            input_schema=None,
             implementation=client.web_fetch,
         )
     )
