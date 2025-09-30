@@ -14,78 +14,43 @@ from llm_ollama.cache import Cache
 cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
 
 
-def _ensure_ollama_api_key():
-    """Set Ollama API key from LLM's key store if not in environment."""
+@llm.hookimpl
+def register_tools(register):
+    """Register Ollama web search tools so LLM can execute them."""
+    try:
+        from ollama import web_search, web_fetch
+    except ImportError:
+        return
+
     import os
+    # Ensure API key is set from LLM's key store if not in environment
     if not os.environ.get("OLLAMA_API_KEY"):
         try:
             key = llm.get_key("", "ollama", "OLLAMA_API_KEY")
             if key:
                 os.environ["OLLAMA_API_KEY"] = key
         except Exception:
-            pass  # Key not found, will rely on environment variable
+            pass
 
+    # Get authenticated client and use its bound methods
+    client = get_client()
 
-@llm.hookimpl
-def register_tools(register):
-    """Register Ollama web search tools so LLM can execute them."""
-    try:
-        import ollama
-    except ImportError:
-        return
-
-    # Wrapper functions that call Ollama's web search
-    # Client is instantiated just-in-time, similar to chat hooks
-    def search_impl(query, max_results=5):
-        try:
-            _ensure_ollama_api_key()
-            client = get_client()
-            result = client.web_search(query=query, max_results=max_results)
-            return str(result)
-        except Exception as e:
-            return f"Error performing web search: {str(e)}"
-
-    def fetch_impl(url):
-        try:
-            _ensure_ollama_api_key()
-            client = get_client()
-            result = client.web_fetch(url=url)
-            return str(result)
-        except Exception as e:
-            return f"Error fetching URL: {str(e)}"
-
-    # Register as LLM tools
+    # Register Ollama's web search tools using the authenticated client's methods
+    # These are already in Ollama's expected format
     register(
         llm.Tool(
             name="web_search",
             description="Search the web for information",
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "The search query"},
-                    "max_results": {
-                        "type": "integer",
-                        "description": "Maximum number of results (default 5, max 10)",
-                        "default": 5,
-                    },
-                },
-                "required": ["query"],
-            },
-            implementation=search_impl,
+            input_schema=None,
+            implementation=client.web_search,
         )
     )
     register(
         llm.Tool(
             name="web_fetch",
             description="Fetch the contents of a web page",
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "url": {"type": "string", "description": "The URL to fetch"}
-                },
-                "required": ["url"],
-            },
-            implementation=fetch_impl,
+            input_schema=None,
+            implementation=client.web_fetch,
         )
     )
 
@@ -299,18 +264,9 @@ class Ollama(_SharedOllama, llm.Model):
         elif prompt.schema:
             kwargs["format"] = prompt.schema
         if prompt.tools:
-            # Convert LLM tools to Ollama format
-            ollama_tools = []
-            for tool in prompt.tools:
-                ollama_tools.append({
-                    "type": "function",
-                    "function": {
-                        "name": tool.name,
-                        "description": tool.description or "",
-                        "parameters": tool.input_schema,
-                    }
-                })
-            kwargs["tools"] = ollama_tools
+            kwargs["tools"] = [
+                tool.implementation for tool in prompt.tools if tool.implementation
+            ]
         if stream:
             response_stream = get_client().chat(
                 model=self.model_id,
@@ -391,18 +347,9 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
         elif prompt.schema:
             kwargs["format"] = prompt.schema
         if prompt.tools:
-            # Convert LLM tools to Ollama format
-            ollama_tools = []
-            for tool in prompt.tools:
-                ollama_tools.append({
-                    "type": "function",
-                    "function": {
-                        "name": tool.name,
-                        "description": tool.description or "",
-                        "parameters": tool.input_schema,
-                    }
-                })
-            kwargs["tools"] = ollama_tools
+            kwargs["tools"] = [
+                tool.implementation for tool in prompt.tools if tool.implementation
+            ]
 
         try:
             if stream:
