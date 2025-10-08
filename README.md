@@ -63,6 +63,8 @@ Ollama models with [tools support](https://ollama.com/search?c=tools) can make u
 llm -m llama3.2 -T llm_time 'What is the time?' --td
 ```
 
+The plugin also registers `ollama_web_search` and `ollama_web_fetch` tools that wrap the [web search API](https://docs.ollama.com/web-search) provided by `ollama.com`. These tools augment models with the latest information to reduce hallucinations and improve accuracy. To use these tools, ensure that the `OLLAMA_API_KEY` environment variable is set with a (free) API key.
+
 ### Embeddings
 
 The plugin supports [LLM embeddings](https://llm.datasette.io/en/stable/embeddings/cli.html). Both regular and specialized embedding models (such as `mxbai-embed-large`) can be used:

@@ -6,6 +6,7 @@ from typing import List, Optional, Tuple
 
 import llm
 from llm.utils import dicts_to_table_string
+from ollama import web_fetch, web_search
 from pydantic import Field, TypeAdapter, ValidationError
 
 from llm_ollama.auth import get_async_client, get_client
@@ -35,6 +36,24 @@ def register_commands(cli):
         ]
         done = dicts_to_table_string(["model", "digest", "capabilities"], to_print)
         print("\n".join(done))
+
+
+@llm.hookimpl
+def register_tools(register):
+    register(
+        llm.Tool(
+            name="ollama_web_search",
+            description="Search the web for information",
+            implementation=web_search,
+        ),
+    )
+    register(
+        llm.Tool(
+            name="ollama_web_fetch",
+            description="Fetch the contents of a web page",
+            implementation=web_fetch,
+        ),
+    )
 
 
 @llm.hookimpl
