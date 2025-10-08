@@ -1,15 +1,13 @@
 from unittest.mock import AsyncMock, Mock
 
 import ollama
-
 import pytest
-
 from httpx import ConnectError
-
 from llm import (
     get_async_model,
     get_embedding_models_with_aliases,
     get_models_with_aliases,
+    get_tools,
 )
 from llm.plugins import load_plugins, pm
 
@@ -82,6 +80,12 @@ def test_plugin_is_installed():
     load_plugins()
     names = [mod.__name__ for mod in pm.get_plugins()]
     assert "llm_ollama" in names
+
+
+def test_registered_tools():
+    tool_names = get_tools().keys()
+    assert "ollama_web_search" in tool_names
+    assert "ollama_web_fetch" in tool_names
 
 
 def test_registered_chat_models(mock_ollama_client):
