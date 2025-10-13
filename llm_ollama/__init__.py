@@ -34,6 +34,7 @@ def register_commands(cli):
             }
             for model in _get_ollama_models()
         ]
+        to_print.sort(key=lambda x: x["model"])
         done = dicts_to_table_string(["model", "digest", "capabilities"], to_print)
         print("\n".join(done))
 
