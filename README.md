@@ -102,7 +102,7 @@ asyncio.run(run())
 
 ## Model aliases
 
-The same Ollama model may be referred by several names with different tags. For example, in the following list, there is a single unique model with three different names:
+The same Ollama model may be referenced by several names with different tags. For example, in the following list, there is a single unique model with three different names:
 
 ```bash
 ollama list
