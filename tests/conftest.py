@@ -115,7 +115,7 @@ def pytest_collection_modifyitems(
         for item in items:
             if "integration" in item.keywords:
                 item.add_marker(skip_integration)
-    elif not config._vision["enabled"]:
+    if not config._vision["enabled"]:
         skip_vision = pytest.mark.skip(reason="Vision tests disabled")
         for item in items:
             if "vision" in item.keywords:
