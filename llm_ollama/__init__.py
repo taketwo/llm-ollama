@@ -190,10 +190,10 @@ class _SharedOllama:
                 )
                 current_system = prev_response.prompt.system
             messages.append({"role": "user", "content": prev_response.prompt.prompt})
-            if prev_response.attachments:
+            if prev_response.prompt.attachments:
                 messages[-1]["images"] = [
                     attachment.base64_content()
-                    for attachment in prev_response.attachments
+                    for attachment in prev_response.prompt.attachments
                 ]
 
             messages.append(
@@ -202,6 +202,10 @@ class _SharedOllama:
         if prompt.system and prompt.system != current_system:
             messages.append({"role": "system", "content": prompt.system})
         messages.append({"role": "user", "content": prompt.prompt})
+        if prompt.attachments:
+            messages[-1]["images"] = [
+                attachment.base64_content() for attachment in prompt.attachments
+            ]
         for tool_result in prompt.tool_results:
             messages.append(
                 {
