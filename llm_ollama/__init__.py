@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator
 import llm
 import ollama
 from llm.utils import dicts_to_table_string
+from ollama._utils import convert_function_to_tool
 from pydantic import Field, TypeAdapter, ValidationError
 
 from llm_ollama.auth import get_async_client, get_client
@@ -247,9 +248,7 @@ class Ollama(_SharedOllama, llm.Model):
         elif prompt.schema:
             kwargs["format"] = prompt.schema
         if prompt.tools:
-            kwargs["tools"] = [
-                tool.implementation for tool in prompt.tools if tool.implementation
-            ]
+            kwargs["tools"] = [_llm_tool_to_ollama_tool(tool) for tool in prompt.tools]
         if stream:
             response_stream = get_client().chat(
                 model=self.model_id,
@@ -463,3 +462,28 @@ def _get_ollama_model_capabilities(digest: str, model: str) -> list[str]:
 
     """
     return get_client().show(model).capabilities or []
+
+
+def _llm_tool_to_ollama_tool(tool: llm.Tool) -> ollama.Tool:
+    """Convert an llm.Tool to an ollama.Tool.
+
+    Uses ollama's convert_function_to_tool to properly convert the function
+    signature to a schema that matches ollama's expectations.
+
+    Parameters
+    ----------
+    tool : llm.Tool
+        An llm.Tool instance with a callable implementation.
+
+    Returns
+    -------
+    ollama.Tool
+        An ollama.Tool instance.
+
+    """
+    ollama_tool = convert_function_to_tool(tool.implementation)
+    if tool.name != tool.implementation.__name__:
+        ollama_tool.function.name = tool.name
+    if tool.description:
+        ollama_tool.function.description = tool.description
+    return ollama_tool
