@@ -1,7 +1,7 @@
 """Authentication functionality for Ollama clients."""
 
 import os
-from typing import TYPE_CHECKING, Type, TypedDict, TypeVar
+from typing import TYPE_CHECKING, TypedDict, TypeVar
 from urllib.parse import unquote, urlparse
 
 import httpx
@@ -89,13 +89,15 @@ def _parse_auth_from_env() -> tuple[str | None, httpx.BasicAuth | None]:
 
 
 class ClientParams(TypedDict):
+    """Type definition for Ollama client initialization parameters."""
+
     host: "NotRequired[str]"
     timeout: "NotRequired[httpx.Timeout]"
     auth: "NotRequired[httpx.Auth]"
     headers: "dict[str, str]"
 
 
-def _create_client(client_class: Type[T]):
+def _create_client(client_class: type[T]) -> T:
     """Create a client with host, authentication, and headers set based on environment variables."""
     host, auth = _parse_auth_from_env()
     kwargs: ClientParams = {

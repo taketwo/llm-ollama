@@ -2,6 +2,7 @@ import contextlib
 import os
 import warnings
 from collections import defaultdict
+from collections.abc import AsyncGenerator
 
 import llm
 from llm.utils import dicts_to_table_string
@@ -205,14 +206,14 @@ class _SharedOllama:
             messages[-1]["images"] = [
                 attachment.base64_content() for attachment in prompt.attachments
             ]
-        for tool_result in prompt.tool_results:
-            messages.append(
-                {
-                    "role": "tool",
-                    "content": tool_result.output,
-                    "name": tool_result.name,
-                }
-            )
+        messages.extend(
+            {
+                "role": "tool",
+                "content": tool_result.output,
+                "name": tool_result.name,
+            }
+            for tool_result in prompt.tool_results
+        )
 
         return messages
 
@@ -264,7 +265,7 @@ class Ollama(_SharedOllama, llm.Model):
                             llm.ToolCall(
                                 name=tool_call.function.name,
                                 arguments=tool_call.function.arguments,
-                            )
+                            ),
                         )
                 with contextlib.suppress(KeyError):
                     if chunk["done"]:
@@ -292,7 +293,7 @@ class Ollama(_SharedOllama, llm.Model):
                         llm.ToolCall(
                             name=tool_call.function.name,
                             arguments=tool_call.function.arguments,
-                        )
+                        ),
                     )
         self.set_usage(response, usage)
 
@@ -302,17 +303,22 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
         self,
         prompt: llm.Prompt,
         stream: bool,
-        response: llm.Response,
-        conversation=None,
-    ):
-        """
-        Executes the Ollama model asynchronously.
+        response: llm.AsyncResponse,
+        conversation: llm.AsyncConversation | None = None,
+    ) -> AsyncGenerator[str, None]:
+        """Execute the Ollama model asynchronously.
 
-        Args:
-            prompt (llm.Prompt): The prompt for the model.
-            stream (bool): Whether to stream the response.
-            response (llm.Response): The response object to populate.
-            conversation (Optional): The conversation context.
+        Parameters
+        ----------
+        prompt : llm.Prompt
+            The prompt for the model.
+        stream : bool
+            Whether to stream the response.
+        response : llm.AsyncResponse
+            The response object to populate.
+        conversation : llm.AsyncConversation | None, optional
+            The conversation context.
+
         """
         messages = self.build_messages(prompt, conversation)
         response._prompt_json = {"messages": messages}
