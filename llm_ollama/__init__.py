@@ -333,6 +333,8 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
             kwargs["format"] = "json"
         elif prompt.schema:
             kwargs["format"] = prompt.schema
+        if prompt.tools:
+            kwargs["tools"] = [_llm_tool_to_ollama_tool(tool) for tool in prompt.tools]
 
         try:
             if stream:
