@@ -1,7 +1,7 @@
 """Authentication functionality for Ollama clients."""
 
 import os
-from typing import Optional, Tuple, Type, TypedDict, TypeVar, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Type, TypedDict, TypeVar
 from urllib.parse import unquote, urlparse
 
 import httpx
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 DEFAULT_REQUEST_TIMEOUT = None
 CONNECT_TIMEOUT = 1.0
 
-T = TypeVar("T", bound=Union[ollama.Client, ollama.AsyncClient])
+T = TypeVar("T", bound=ollama.Client | ollama.AsyncClient)
 
 
 def get_client() -> ollama.Client:
@@ -30,7 +30,7 @@ def get_async_client() -> ollama.AsyncClient:
     return _create_client(ollama.AsyncClient)
 
 
-def _parse_auth_from_url(url: str) -> Tuple[str, Optional[httpx.BasicAuth]]:
+def _parse_auth_from_url(url: str) -> tuple[str, httpx.BasicAuth | None]:
     """Parse URL and extract credentials if present.
 
     Parameters
@@ -40,7 +40,7 @@ def _parse_auth_from_url(url: str) -> Tuple[str, Optional[httpx.BasicAuth]]:
 
     Returns
     -------
-    Tuple[str, Optional[httpx.BasicAuth]]
+    tuple[str, httpx.BasicAuth | None]
         A tuple containing the clean URL without credentials and an httpx.BasicAuth
         object if credentials were found, or None if no credentials were present.
 
@@ -79,7 +79,7 @@ def _parse_headers_from_env() -> dict[str, str]:
     return collector
 
 
-def _parse_auth_from_env() -> Tuple[Optional[str], Optional[httpx.BasicAuth]]:
+def _parse_auth_from_env() -> tuple[str | None, httpx.BasicAuth | None]:
     """Parse OLLAMA_HOST environment variable and extract credentials."""
     host = os.getenv("OLLAMA_HOST")
     auth = None

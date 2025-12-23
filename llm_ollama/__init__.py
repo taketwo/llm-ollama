@@ -2,7 +2,6 @@ import contextlib
 import os
 import warnings
 from collections import defaultdict
-from typing import List, Optional, Tuple
 
 import llm
 from llm.utils import dicts_to_table_string
@@ -107,51 +106,51 @@ class _SharedOllama:
         See: https://github.com/ollama/ollama/blob/main/docs/modelfile.md#parameter
         """
 
-        num_ctx: Optional[int] = Field(
+        num_ctx: int | None = Field(
             default=None,
             description="Sets the size of the context window used to generate the next token. (Default: 2048)",
         )
-        repeat_last_n: Optional[int] = Field(
+        repeat_last_n: int | None = Field(
             default=None,
             description="Sets how far back for the model to look back to prevent repetition. (Default: 64, 0 = disabled, -1 = num_ctx)",
         )
-        repeat_penalty: Optional[float] = Field(
+        repeat_penalty: float | None = Field(
             default=None,
             description="Sets how strongly to penalize repetitions. A higher value (e.g., 1.5) will penalize repetitions more strongly, while a lower value (e.g., 0.9) will be more lenient. (Default: 1.1)",
         )
-        temperature: Optional[float] = Field(
+        temperature: float | None = Field(
             default=None,
             description="The temperature of the model. Increasing the temperature will make the model answer more creatively. (Default: 0.8)",
         )
-        seed: Optional[int] = Field(
+        seed: int | None = Field(
             default=None,
             description="Sets the random number seed to use for generation. Setting this to a specific number will make the model generate the same text for the same prompt. (Default: 0)",
         )
-        stop: Optional[List[str]] = Field(
+        stop: list[str] | None = Field(
             default=None,
             description="Sets the stop sequences to use. When this pattern is encountered the LLM will stop generating text and return.",
         )
-        num_predict: Optional[int] = Field(
+        num_predict: int | None = Field(
             default=None,
             description="Maximum number of tokens to predict when generating text. (Default: -1, infinite generation)",
         )
-        top_k: Optional[int] = Field(
+        top_k: int | None = Field(
             default=None,
             description="Reduces the probability of generating nonsense. A higher value (e.g. 100) will give more diverse answers, while a lower value (e.g. 10) will be more conservative. (Default: 40)",
         )
-        top_p: Optional[float] = Field(
+        top_p: float | None = Field(
             default=None,
             description="Works together with top-k. A higher value (e.g., 0.95) will lead to more diverse text, while a lower value (e.g., 0.5) will generate more focused and conservative text. (Default: 0.9)",
         )
-        min_p: Optional[float] = Field(
+        min_p: float | None = Field(
             default=None,
             description="Alternative to the top_p, and aims to ensure a balance of quality and variety. The parameter p represents the minimum probability for a token to be considered, relative to the probability of the most likely token. (Default: 0.0)",
         )
-        json_object: Optional[bool] = Field(
+        json_object: bool | None = Field(
             default=None,
             description="Output a valid JSON object {...}. Prompt must mention JSON.",
         )
-        think: Optional[bool] = Field(
+        think: bool | None = Field(
             default=None,
             description="Enable the model's thinking process.",
         )
@@ -397,7 +396,7 @@ class OllamaEmbed(llm.EmbeddingModel):
         yield from result["embeddings"]
 
 
-def _pick_primary_name(names: List[str]) -> Tuple[str, Tuple[str, ...]]:
+def _pick_primary_name(names: list[str]) -> tuple[str, tuple[str, ...]]:
     """Pick the primary model name from a list of names.
 
     The picking algorithm prefers names with the most specific tag, e.g. "llama2:7b-q4_K_M"
@@ -428,7 +427,7 @@ def _pick_primary_name(names: List[str]) -> Tuple[str, Tuple[str, ...]]:
     return sorted_names[0], tuple(sorted_names[1:])
 
 
-def _get_ollama_models() -> List[dict]:
+def _get_ollama_models() -> list[dict]:
     """Get a list of models available on Ollama.
 
     Returns
@@ -445,7 +444,7 @@ def _get_ollama_models() -> List[dict]:
 
 
 @cache("model_capabilities", key="digest")
-def _get_ollama_model_capabilities(digest: str, model: str) -> List[str]:
+def _get_ollama_model_capabilities(digest: str, model: str) -> list[str]:
     """Get a list of capabilities for a given Ollama model.
 
     This function may raise an exception if the Ollama server is down or the model does
