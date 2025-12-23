@@ -6,8 +6,8 @@ readme = "README.md"
 authors = [{ name = "Sergey Alexandrov" }]
 license = { text = "Apache-2.0" }
 classifiers = ["License :: OSI Approved :: Apache Software License"]
-dependencies = ["llm>=0.26", "ollama>=0.6.0", "pydantic>=2"]
-requires-python = ">=3.9"
+dependencies = ["llm>=0.28", "ollama>=0.6.0", "pydantic>=2"]
+requires-python = ">=3.10"
 
 [project.urls]
 Homepage = "https://github.com/taketwo/llm-ollama"
