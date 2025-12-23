@@ -5,8 +5,8 @@ from collections import defaultdict
 from collections.abc import AsyncGenerator
 
 import llm
+import ollama
 from llm.utils import dicts_to_table_string
-from ollama import web_fetch, web_search
 from pydantic import Field, TypeAdapter, ValidationError
 
 from llm_ollama.auth import get_async_client, get_client
@@ -45,14 +45,14 @@ def register_tools(register):
         llm.Tool(
             name="ollama_web_search",
             description="Search the web for information",
-            implementation=web_search,
+            implementation=ollama.web_search,
         ),
     )
     register(
         llm.Tool(
             name="ollama_web_fetch",
             description="Fetch the contents of a web page",
-            implementation=web_fetch,
+            implementation=ollama.web_fetch,
         ),
     )
 
