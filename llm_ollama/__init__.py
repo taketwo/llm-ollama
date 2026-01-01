@@ -13,8 +13,8 @@ from pydantic import Field, TypeAdapter, ValidationError
 from llm_ollama.auth import get_async_client, get_client
 from llm_ollama.cache import Cache
 
-
 cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
+
 
 @llm.hookimpl
 def register_commands(cli):
@@ -292,20 +292,11 @@ class Ollama(_SharedOllama, llm.Model):
                     yield chunk["message"]["content"]
                 if hasattr(chunk, 'logprobs') and chunk.logprobs:
                     collected_logprobs.extend(chunk.logprobs)
-            # Initialize response.response_json as an empty dict if None:
+
             if response.response_json is None:
                 response.response_json = {}
             if collected_logprobs:
-                if hasattr(collected_logprobs[0], 'model_dump'):
-                    response.response_json['logprobs'] = [
-                        lp.model_dump() for lp in collected_logprobs
-                    ]
-                elif hasattr(collected_logprobs[0], 'dict'):
-                    response.response_json['logprobs'] = [
-                        lp.dict() for lp in collected_logprobs
-                    ]
-                else:
-                    response.response_json['logprobs'] = collected_logprobs
+                response.response_json["logprobs"] = _logprobs_to_dicts(collected_logprobs)
         else:
             ollama_response = get_client().chat(
                 model=self.model_id,
@@ -400,17 +391,7 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                 
                 # Store collected logprobs in response
                 if collected_logprobs:
-                    # Convert Logprob objects to dictionaries if needed
-                    if hasattr(collected_logprobs[0], 'model_dump'):
-                        response.response_json['logprobs'] = [
-                            lp.model_dump() for lp in collected_logprobs
-                        ]
-                    elif hasattr(collected_logprobs[0], 'dict'):
-                        response.response_json['logprobs'] = [
-                            lp.dict() for lp in collected_logprobs
-                        ]
-                    else:
-                        response.response_json['logprobs'] = collected_logprobs
+                    response.response_json["logprobs"] = _logprobs_to_dicts(collected_logprobs)
                         
             else:
                 ollama_response = await get_async_client().chat(
@@ -426,27 +407,8 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                 }
                 yield response.response_json["message"]["content"]
                 
-                if ollama_response.message.tool_calls:
-                    for tool_call in ollama_response.message.tool_calls:
-                        response.add_tool_call(
-                            llm.ToolCall(
-                                name=tool_call.function.name,
-                                arguments=tool_call.function.arguments,
-                            ),
-                        )
-                
                 if hasattr(ollama_response, 'logprobs') and ollama_response.logprobs:
-                    # Convert Logprob objects to dictionaries if needed
-                    if hasattr(ollama_response.logprobs[0], 'model_dump'):
-                        response.response_json['logprobs'] = [
-                            lp.model_dump() for lp in ollama_response.logprobs
-                        ]
-                    elif hasattr(ollama_response.logprobs[0], 'dict'):
-                        response.response_json['logprobs'] = [
-                            lp.dict() for lp in ollama_response.logprobs
-                        ]
-                    else:
-                        response.response_json['logprobs'] = ollama_response.logprobs
+                    response.response_json["logprobs"] = _logprobs_to_dicts(ollama_response.logprobs)
             
             self.set_usage(response, usage)
             
@@ -547,6 +509,31 @@ def _get_ollama_model_capabilities(digest: str, model: str) -> list[str]:
 
     """
     return get_client().show(model).capabilities or []
+
+def _logprobs_to_dicts(logprobs: list[ollama._types.Logprob] | list[dict]) -> list[dict]:
+    """Convert Logprob objects to dictionaries for JSON serialization.
+    
+    Parameters
+    ----------
+    logprobs : list[ollama._types.Logprob] or list[dict]
+        A list of Logprob objects (or dictionaries). The function handles
+        Logprob objects that have a `model_dump` method, a `dict` method,
+        or are already dictionaries.
+    
+    Returns
+    -------
+    list[dict]
+        A list of dictionaries representing the logprobs.
+    """
+    if not logprobs:
+        return []
+    if hasattr(logprobs[0], 'model_dump'):
+        return [lp.model_dump() for lp in logprobs]
+    elif hasattr(logprobs[0], 'dict'):
+        return [lp.dict() for lp in logprobs]
+    else:
+        # Assume it's already a dictionary
+        return logprobs
 
 
 def _llm_tool_to_ollama_tool(tool: llm.Tool) -> ollama.Tool:
