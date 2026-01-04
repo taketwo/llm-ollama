@@ -290,13 +290,15 @@ class Ollama(_SharedOllama, llm.Model):
                             "completion_tokens": chunk["eval_count"],
                         }
                     yield chunk["message"]["content"]
-                if hasattr(chunk, 'logprobs') and chunk.logprobs:
+                if hasattr(chunk, "logprobs") and chunk.logprobs:
                     collected_logprobs.extend(chunk.logprobs)
 
             if response.response_json is None:
                 response.response_json = {}
             if collected_logprobs:
-                response.response_json["logprobs"] = _logprobs_to_dicts(collected_logprobs)
+                response.response_json["logprobs"] = _logprobs_to_dicts(
+                    collected_logprobs
+                )
         else:
             ollama_response = get_client().chat(
                 model=self.model_id,
@@ -382,17 +384,19 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                                 "prompt_tokens": chunk["prompt_eval_count"],
                                 "completion_tokens": chunk["eval_count"],
                             }
-                    
-                    if hasattr(chunk, 'logprobs') and chunk.logprobs:
+
+                    if hasattr(chunk, "logprobs") and chunk.logprobs:
                         collected_logprobs.extend(chunk.logprobs)
-                
+
                 if response.response_json is None:
                     response.response_json = {}
-                
+
                 # Store collected logprobs in response
                 if collected_logprobs:
-                    response.response_json["logprobs"] = _logprobs_to_dicts(collected_logprobs)
-                        
+                    response.response_json["logprobs"] = _logprobs_to_dicts(
+                        collected_logprobs
+                    )
+
             else:
                 ollama_response = await get_async_client().chat(
                     model=self.model_id,
@@ -406,12 +410,14 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                     "completion_tokens": response.response_json["eval_count"],
                 }
                 yield response.response_json["message"]["content"]
-                
-                if hasattr(ollama_response, 'logprobs') and ollama_response.logprobs:
-                    response.response_json["logprobs"] = _logprobs_to_dicts(ollama_response.logprobs)
-            
+
+                if hasattr(ollama_response, "logprobs") and ollama_response.logprobs:
+                    response.response_json["logprobs"] = _logprobs_to_dicts(
+                        ollama_response.logprobs
+                    )
+
             self.set_usage(response, usage)
-            
+
         except Exception as e:
             raise RuntimeError(f"Async execution failed: {e}") from e
 
@@ -510,16 +516,19 @@ def _get_ollama_model_capabilities(digest: str, model: str) -> list[str]:
     """
     return get_client().show(model).capabilities or []
 
-def _logprobs_to_dicts(logprobs: list[ollama._types.Logprob] | list[dict]) -> list[dict]:
+
+def _logprobs_to_dicts(
+    logprobs: list[ollama._types.Logprob] | list[dict],
+) -> list[dict]:
     """Convert Logprob objects to dictionaries for JSON serialization.
-    
+
     Parameters
     ----------
     logprobs : list[ollama._types.Logprob] or list[dict]
         A list of Logprob objects (or dictionaries). The function handles
         Logprob objects that have a `model_dump` method, a `dict` method,
         or are already dictionaries.
-    
+
     Returns
     -------
     list[dict]
@@ -527,9 +536,9 @@ def _logprobs_to_dicts(logprobs: list[ollama._types.Logprob] | list[dict]) -> li
     """
     if not logprobs:
         return []
-    if hasattr(logprobs[0], 'model_dump'):
+    if hasattr(logprobs[0], "model_dump"):
         return [lp.model_dump() for lp in logprobs]
-    elif hasattr(logprobs[0], 'dict'):
+    elif hasattr(logprobs[0], "dict"):
         return [lp.dict() for lp in logprobs]
     else:
         # Assume it's already a dictionary
