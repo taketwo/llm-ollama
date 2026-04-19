@@ -23,8 +23,14 @@ def mock_ollama_async_client():
         yield mock
 
 
+@pytest.fixture
+def mock_get_key():
+    with patch("llm_ollama.auth.llm.get_key", return_value=None) as mock:
+        yield mock
+
+
 def parametrize_clients():
-    """Decorator to apply client parameterization to test methods."""
+    """Decorator to run the same test for both sync and async clients."""
     return pytest.mark.parametrize(
         ("get_client_func", "mock_fixture"),
         [
@@ -34,35 +40,41 @@ def parametrize_clients():
     )
 
 
-class TestAuthentication:
-    """Tests for Ollama client authentication."""
+class TestClientCreation:
+    """Tests for Ollama client creation.
+
+    Each test is parameterized over sync/async to verify parity. mock_get_key suppresses
+    real LLM key lookup unless the test is specifically about API key behaviour.
+    """
 
     @parametrize_clients()
-    def test_no_environment_variable(
+    def test_defaults(
         self,
         get_client_func,
         mock_fixture,
         request,
         monkeypatch,
+        mock_get_key,
     ):
-        """Test client creation when OLLAMA_HOST is not set."""
         monkeypatch.delenv("OLLAMA_HOST", raising=False)
         monkeypatch.delenv("OLLAMA_HEADERS", raising=False)
+        monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
         mock_client_class = request.getfixturevalue(mock_fixture)
         get_client_func()
         mock_client_class.assert_called_once_with(timeout=ANY, headers={})
 
     @parametrize_clients()
-    def test_host_without_auth(
+    def test_host_without_credentials(
         self,
         get_client_func,
         mock_fixture,
         request,
         monkeypatch,
+        mock_get_key,
     ):
-        """Test client creation with host but without authentication."""
         monkeypatch.setenv("OLLAMA_HOST", "http://localhost:11434")
         monkeypatch.delenv("OLLAMA_HEADERS", raising=False)
+        monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
         mock_client_class = request.getfixturevalue(mock_fixture)
         get_client_func()
         mock_client_class.assert_called_once_with(
@@ -72,23 +84,22 @@ class TestAuthentication:
         )
 
     @parametrize_clients()
-    def test_host_with_auth(
+    def test_host_with_basic_auth(
         self,
         get_client_func,
         mock_fixture,
         request,
         mock_basic_auth,
         monkeypatch,
+        mock_get_key,
     ):
-        """Test client creation with host and authentication."""
         monkeypatch.setenv("OLLAMA_HOST", "http://user:pass@example.com:8080")
         monkeypatch.delenv("OLLAMA_HEADERS", raising=False)
+        monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
         mock_client_class = request.getfixturevalue(mock_fixture)
         mock_auth_instance = Mock()
         mock_basic_auth.return_value = mock_auth_instance
-
         get_client_func()
-
         mock_basic_auth.assert_called_once_with(username="user", password="pass")
         mock_client_class.assert_called_once_with(
             host="http://example.com:8080",
@@ -98,25 +109,65 @@ class TestAuthentication:
         )
 
     @parametrize_clients()
-    def test_host_and_headers(
+    def test_custom_headers(
         self,
         get_client_func,
         mock_fixture,
         request,
         monkeypatch,
+        mock_get_key,
     ):
-        ollama_headers = {"Authorization": "Bearer TOKEN"}
-        monkeypatch.setenv("OLLAMA_HOST", "http://example.com:8080")
-        monkeypatch.setenv(
-            "OLLAMA_HEADERS",
-            ",".join(["=".join(item) for item in ollama_headers.items()]),
-        )
+        monkeypatch.delenv("OLLAMA_HOST", raising=False)
+        monkeypatch.setenv("OLLAMA_HEADERS", "X-Custom-Header=value")
+        monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
         mock_client_class = request.getfixturevalue(mock_fixture)
         get_client_func()
         mock_client_class.assert_called_once_with(
-            host="http://example.com:8080",
-            headers=ollama_headers,
+            headers={"X-Custom-Header": "value"},
             timeout=ANY,
+        )
+
+    @parametrize_clients()
+    def test_api_key_injected_as_bearer_token(
+        self,
+        get_client_func,
+        mock_fixture,
+        request,
+        monkeypatch,
+        mock_get_key,
+    ):
+        monkeypatch.delenv("OLLAMA_HOST", raising=False)
+        monkeypatch.delenv("OLLAMA_HEADERS", raising=False)
+        monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+        mock_client_class = request.getfixturevalue(mock_fixture)
+        mock_get_key.return_value = "test-key"
+        get_client_func()
+        mock_get_key.assert_called_once_with(alias="ollama", env="OLLAMA_API_KEY")
+        mock_client_class.assert_called_once_with(
+            timeout=ANY,
+            headers={"Authorization": "Bearer test-key"},
+        )
+
+    @parametrize_clients()
+    def test_ollama_headers_authorization_takes_precedence_over_api_key(
+        self,
+        get_client_func,
+        mock_fixture,
+        request,
+        monkeypatch,
+        mock_get_key,
+    ):
+        """Explicit Authorization in OLLAMA_HEADERS wins; get_key is not called at all."""
+        monkeypatch.delenv("OLLAMA_HOST", raising=False)
+        monkeypatch.setenv("OLLAMA_HEADERS", "Authorization=Bearer explicit-token")
+        monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+        mock_client_class = request.getfixturevalue(mock_fixture)
+        mock_get_key.return_value = "api-key"
+        get_client_func()
+        mock_get_key.assert_not_called()
+        mock_client_class.assert_called_once_with(
+            timeout=ANY,
+            headers={"Authorization": "Bearer explicit-token"},
         )
 
 
@@ -145,10 +196,12 @@ def test_various_basic_auth_formats(
     expected_pass,
     mock_basic_auth,
     mock_ollama_client,
+    mock_get_key,
     monkeypatch,
 ):
     """Test parsing various URL formats with basic authentication."""
     monkeypatch.delenv("OLLAMA_HEADERS", raising=False)
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
     monkeypatch.setenv("OLLAMA_HOST", host_env)
     mock_auth_instance = Mock()
     mock_basic_auth.return_value = mock_auth_instance
@@ -189,10 +242,12 @@ def test_various_ollama_headers_formats(
     headers_env,
     expected_headers,
     mock_ollama_client,
+    mock_get_key,
     monkeypatch,
 ):
     """Test parsing various OLLAMA_HEADERS formats."""
     monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
     monkeypatch.setenv("OLLAMA_HEADERS", headers_env)
     if expected_headers is ValueError:
         with pytest.raises(ValueError, match="Invalid OLLAMA_HEADERS format"):

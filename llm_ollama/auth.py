@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, TypedDict, TypeVar
 from urllib.parse import unquote, urlparse
 
 import httpx
+import llm
 import ollama
 
 if TYPE_CHECKING:
@@ -100,9 +101,14 @@ class ClientParams(TypedDict):
 def _create_client(client_class: type[T]) -> T:
     """Create a client with host, authentication, and headers set based on environment variables."""
     host, auth = _parse_auth_from_env()
+    headers = _parse_headers_from_env()
+    if not any(k.lower() == "authorization" for k in headers):
+        api_key = llm.get_key(alias="ollama", env="OLLAMA_API_KEY")
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
     kwargs: ClientParams = {
         "timeout": httpx.Timeout(DEFAULT_REQUEST_TIMEOUT, connect=CONNECT_TIMEOUT),
-        "headers": _parse_headers_from_env(),
+        "headers": headers,
     }
     if host is not None:
         kwargs["host"] = host
