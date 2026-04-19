@@ -15,37 +15,50 @@ Install this plugin in the same environment as [LLM](https://llm.datasette.io/).
 llm install llm-ollama
 ```
 
-## Usage
+## Quickstart
 
-First, ensure that the Ollama server is running and that you have pulled some models. You can use `ollama list` to check what is locally available.
+By default, the plugin connects to a local Ollama server. Ensure the server is running and has some models available. Alternatively, the plugin can connect to a remote or managed Ollama cloud server; see [Connecting to Ollama server](#connecting-to-ollama-server) for configuration instructions.
 
-The plugin will query the Ollama server for the list of models. You can use `llm ollama models` to see the list; it should be the same as output by `ollama list`. All these models will be automatically registered with LLM and made available for prompting, chatting, and embedding.
-
-Assuming you have `llama3.2:latest` available, you can run a prompt using:
+The plugin automatically discovers all models available on the server and registers them with LLM. To see the list of models and their capabilities, run:
 
 ```bash
-llm -m llama3.2:latest 'How much is 2+2?'
+llm ollama models
+```
+```bash
+model                             digest          capabilities
+gemma3:latest                     c0494fe00251    completion, vision
+gpt-oss:120b-cloud                569662207105    completion, tools, thinking
+mxbai-embed-large:latest          468836162de7    embedding
+qwen3:4b                          2bfd38a7daaf    completion, tools, thinking
 ```
 
-The plugin automatically creates a shorter alias for models that have `:latest` in the name, so the previous command is equivalent to running:
+Once registered, models are available for prompting, chatting, and embedding. Assuming you have `gemma3:latest` available, you can run a prompt using:
 
 ```bash
-llm -m llama3.2 'How much is 2+2?'
+llm -m gemma3:latest 'How much is 2+2?'
 ```
 
-To start an interactive chat session:
+The plugin automatically creates shorter aliases for models that have `:latest` in the name, so the previous command is equivalent to running:
 
 ```bash
-llm chat -m llama3.2
+llm -m gemma3 'How much is 2+2?'
 ```
+
+To start an interactive chat session instead of a one-shot prompt, run:
+
+```bash
+llm chat -m gemma3
 ```
-Chatting with llama3.2:latest
+```bash
+Chatting with gemma3:latest
 Type 'exit' or 'quit' to exit
 Type '!multi' to enter multiple lines, then '!end' to finish
 Type '!edit' to open your default editor and modify the prompt
 Type '!fragment <my_fragment> [<another_fragment> ...]' to insert one or more fragments
 >
 ```
+
+## Features
 
 ### Image attachments
 
@@ -63,7 +76,7 @@ Ollama models with [tools support](https://ollama.com/search?c=tools) can make u
 llm -m llama3.2 -T llm_time 'What is the time?' --td
 ```
 
-The plugin also registers `ollama_web_search` and `ollama_web_fetch` tools that wrap the [web search API](https://docs.ollama.com/web-search) provided by `ollama.com`. These tools augment models with the latest information to reduce hallucinations and improve accuracy. To use these tools, ensure that the `OLLAMA_API_KEY` environment variable is set with a (free) API key.
+The plugin also registers `ollama_web_search` and `ollama_web_fetch` tools that wrap the [web search API](https://docs.ollama.com/web-search) provided by `ollama.com`. These tools augment models with the latest information to reduce hallucinations and improve accuracy. To use these tools, an API key must be configured (see [Ollama cloud](#ollama-cloud)).
 
 ### Embeddings
 
@@ -123,7 +136,7 @@ Ollama: stable-code:3b (aliases: stable-code:code, stable-code:latest, stable-co
 
 ## Model options
 
-All models accept [Ollama modelfile parameters](https://github.com/ollama/ollama/blob/main/docs/modelfile.md#parameter) as options. Use the `-o name value` syntax to specify them, for example:
+All models accept [Ollama modelfile parameters](https://github.com/ollama/ollama/blob/main/docs/modelfile.mdx#parameter) as options. Use the `-o name value` syntax to specify them, for example:
 
 - `-o temperature 0.8`: set the temperature of the model
 - `-o num_ctx 256000`: set the size of the context window used to generate the next token
@@ -135,43 +148,66 @@ Additionally, the -o flag supports plugin-specific options:
 - `-o json_object 1` forces the model to reply with a valid JSON object. Note that your prompt must mention JSON for this to work;
 - `-o think false` disables the intermediate reasoning step for thinking-capable models.
 
-## Ollama server address
+## Connecting to Ollama server
 
-`llm-ollama` will try to connect to a server at the default `localhost:11434` address. If your Ollama server is remote or runs on a non-default port, you can use `OLLAMA_HOST` environment variable to point the plugin to it, e.g.:
+The plugin connects to an Ollama server to list and run models. Three deployment scenarios are supported: a local server, a self-hosted remote server, and Ollama's hosted cloud service.
+
+### Local server
+
+By default, the plugin connects to a local Ollama server at `localhost:11434`. If your local server runs on a non-default port, set `OLLAMA_HOST`:
+
+```bash
+export OLLAMA_HOST=http://localhost:8080
+```
+
+### Remote server
+
+To connect to a self-hosted Ollama server on your network or in the cloud, set `OLLAMA_HOST` to its address:
 
 ```bash
 export OLLAMA_HOST=https://192.168.1.13:11434
 ```
 
-### Authentication
+#### Authentication
 
-If your Ollama server is protected with Basic Authentication, you can include the credentials directly in the `OLLAMA_HOST` environment variable:
+If the server is protected with Basic Authentication, include the credentials in the URL:
 
 ```bash
 export OLLAMA_HOST=https://username:password@192.168.1.13:11434
 ```
 
-The plugin will parse the credentials and use them for authentication. Special characters in usernames or passwords should be URL-encoded:
+Special characters in usernames or passwords must be URL-encoded:
 
 ```bash
 # For username "user@domain" and password "p@ssw0rd"
 export OLLAMA_HOST=https://user%40domain:p%40ssw0rd@192.168.1.13:11434
 ```
 
-If your Ollama server is exposed behind a reverse proxy with another security mechanism in place, you can attach custom HTTP headers to the requests by setting the `OLLAMA_HEADERS` environment variable to a comma-delimited group of key-value pairs, e.g. `OLLAMA_HEADERS='key1=value1,key2=value2'`.
-
-#### Examples
-
-JWT Token Auth for deployments like Open-WebUI's Ollama endpoint:
+If the server is behind a reverse proxy that requires custom headers, use the `OLLAMA_HEADERS` environment variable with a comma-separated list of `key=value` pairs:
 
 ```bash
+# JWT token auth (e.g. Open-WebUI's Ollama endpoint)
 export OLLAMA_HEADERS='Authorization=Bearer mytoken,User-Agent=custom-client'
+
+# Cloudflare Tunnel with a Service Token
+export OLLAMA_HEADERS='CF-Access-Client-Id=abcdef.access,CF-Access-Client-Secret=123456789'
 ```
 
-Cloudflare Tunnel secured with a Service Token:
+### Ollama cloud
+
+[Ollama cloud](https://ollama.com) is a hosted service that lets you run models without installing or operating a local server. It offers a range of open models and does not require any local setup beyond configuring the plugin.
+
+To use it, point the plugin at the cloud endpoint and provide your API key:
 
 ```bash
-export OLLAMA_HEADERS='CF-Access-Client-Id=abcdef.access,CF-Access-Client-Secret=123456789'
+export OLLAMA_HOST=https://ollama.com
+llm keys set ollama # paste your API key when prompted
+```
+
+The API key is stored securely by `llm` and used automatically. Alternatively, you can set it as an environment variable:
+
+```bash
+export OLLAMA_API_KEY=your-api-key
 ```
 
 ## Development
