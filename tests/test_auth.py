@@ -138,7 +138,7 @@ class TestAuthentication:
         ),
     ],
 )
-def test_various_auth_formats(
+def test_various_basic_auth_formats(
     host_env,
     expected_host,
     expected_user,
@@ -147,14 +147,12 @@ def test_various_auth_formats(
     mock_ollama_client,
     monkeypatch,
 ):
-    """Test parsing various URL formats with authentication."""
+    """Test parsing various URL formats with basic authentication."""
     monkeypatch.delenv("OLLAMA_HEADERS", raising=False)
     monkeypatch.setenv("OLLAMA_HOST", host_env)
     mock_auth_instance = Mock()
     mock_basic_auth.return_value = mock_auth_instance
-
     get_client()
-
     mock_basic_auth.assert_called_once_with(
         username=expected_user,
         password=expected_pass,
@@ -187,16 +185,15 @@ def test_various_auth_formats(
         ("Authorization:Bearer TOKEN", ValueError),
     ],
 )
-def test_various_headers(
+def test_various_ollama_headers_formats(
     headers_env,
     expected_headers,
     mock_ollama_client,
     monkeypatch,
 ):
-    """Test parsing various OLLAMA_HEADERS."""
+    """Test parsing various OLLAMA_HEADERS formats."""
     monkeypatch.delenv("OLLAMA_HOST", raising=False)
     monkeypatch.setenv("OLLAMA_HEADERS", headers_env)
-
     if expected_headers is ValueError:
         with pytest.raises(ValueError, match="Invalid OLLAMA_HEADERS format"):
             get_client()
