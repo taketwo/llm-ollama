@@ -88,6 +88,15 @@ llm embed -m mxbai-embed-large -i README.md
 
 By default, the input will be truncated from the end to fit within the context length. This behavior can be changed by setting `OLLAMA_EMBED_TRUNCATE=no` environment variable. In such cases, embedding operation will fail if the context length is exceeded.
 
+### Reasoning
+
+Ollama models with [thinking support](https://ollama.com/search?c=thinking) stream their reasoning trace alongside the final answer. The plugin surfaces it as a separate reasoning part on the response so it can be displayed, persisted, and round-tripped through follow-up turns.
+
+Two knobs control reasoning behavior:
+
+- `-o think false` disables the reasoning step entirely; the model skips thinking and goes straight to the answer.
+- `--hide-reasoning` (or `hide_reasoning=True` in the Python API) keeps the reasoning step but suppresses the trace from the visible output. The model still thinks; only the trace is hidden.
+
 ### JSON schemas
 
 Ollama's built-in support for [structured outputs](https://ollama.com/blog/structured-outputs) can be accessed through [LLM schemas](https://llm.datasette.io/en/stable/schemas.html), for example:
@@ -148,7 +157,7 @@ See the referenced page for the complete list with descriptions and default valu
 Additionally, the -o flag supports plugin-specific options:
 
 - `-o json_object 1` forces the model to reply with a valid JSON object. Note that your prompt must mention JSON for this to work;
-- `-o think false` disables the intermediate reasoning step for thinking-capable models.
+- `-o think false` disables the intermediate reasoning step for thinking-capable models. See also the [Reasoning](#reasoning) feature section.
 
 ## Connecting to Ollama server
 
