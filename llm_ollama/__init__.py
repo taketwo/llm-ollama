@@ -269,6 +269,8 @@ class _SharedOllama:
         self,
         chunk: ollama.ChatResponse,
         response: "llm.Response | llm.AsyncResponse",
+        *,
+        hide_reasoning: bool = False,
     ) -> tuple[list[StreamEvent], dict | None]:
         """Translate one Ollama chat chunk (streaming or non-streaming) into a list
         of StreamEvents to yield and an optional usage dict to register at end of
@@ -280,10 +282,17 @@ class _SharedOllama:
         so the call survives in ``response.tool_calls()`` while also taking part
         in the StreamEvent ordering used by ``response.stream_events()`` and
         ``response.to_dict()``.
+
+        ``hide_reasoning`` suppresses reasoning events without altering the
+        request: the model still thinks, only the visible trace is dropped. The
+        ``-o think`` option is the user-facing knob for actually disabling the
+        reasoning step.
         """
         events: list[StreamEvent] = []
         if chunk.message.content:
             events.append(StreamEvent(type="text", chunk=chunk.message.content))
+        if chunk.message.thinking and not hide_reasoning:
+            events.append(StreamEvent(type="reasoning", chunk=chunk.message.thinking))
         for tool_call in chunk.message.tool_calls or ():
             tool_call_id = f"tc_{str(monotonic_ulid()).lower()}"
             arguments = dict(tool_call.function.arguments or {})
@@ -338,7 +347,11 @@ class Ollama(_SharedOllama, llm.Model):
                 **kwargs,
             )
             for chunk in response_stream:
-                events, chunk_usage = self._interpret_chunk(chunk, response)
+                events, chunk_usage = self._interpret_chunk(
+                    chunk,
+                    response,
+                    hide_reasoning=prompt.hide_reasoning,
+                )
                 if chunk_usage is not None:
                     usage = chunk_usage
                 yield from events
@@ -350,7 +363,11 @@ class Ollama(_SharedOllama, llm.Model):
                 **kwargs,
             )
             response.response_json = ollama_response.model_dump()
-            events, usage = self._interpret_chunk(ollama_response, response)
+            events, usage = self._interpret_chunk(
+                ollama_response,
+                response,
+                hide_reasoning=prompt.hide_reasoning,
+            )
             yield from events
         self.set_usage(response, usage)
 
@@ -390,7 +407,11 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                 **kwargs,
             )
             async for chunk in response_stream:
-                events, chunk_usage = self._interpret_chunk(chunk, response)
+                events, chunk_usage = self._interpret_chunk(
+                    chunk,
+                    response,
+                    hide_reasoning=prompt.hide_reasoning,
+                )
                 if chunk_usage is not None:
                     usage = chunk_usage
                 for event in events:
@@ -403,7 +424,11 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                 **kwargs,
             )
             response.response_json = ollama_response.model_dump()
-            events, usage = self._interpret_chunk(ollama_response, response)
+            events, usage = self._interpret_chunk(
+                ollama_response,
+                response,
+                hide_reasoning=prompt.hide_reasoning,
+            )
             for event in events:
                 yield event
         self.set_usage(response, usage)
