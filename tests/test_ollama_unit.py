@@ -78,7 +78,14 @@ def mock_ollama_client(mocker):
     return client
 
 
-def _ollama_chunk(content="", *, tool_calls=None, done=False, usage=False):
+def _ollama_chunk(
+    content="",
+    *,
+    thinking=None,
+    tool_calls=None,
+    done=False,
+    usage=False,
+):
     """Build an ollama.ChatResponse chunk for the streaming code paths."""
     typed_calls = [
         ollama.Message.ToolCall(
@@ -92,6 +99,7 @@ def _ollama_chunk(content="", *, tool_calls=None, done=False, usage=False):
         message=ollama.Message(
             role="assistant",
             content=content,
+            thinking=thinking,
             tool_calls=typed_calls or None,
         ),
         done=done,
@@ -392,3 +400,49 @@ def test_tool_conversion_name_and_description_override():
 
     assert ollama_tool.function.name == "custom_name"
     assert ollama_tool.function.description == "Custom description"
+
+
+def test_thinking_surfaces_as_reasoning_part(mocker, mock_ollama_client):
+    """A chunk's thinking content lands as a ReasoningPart on the response."""
+    from llm.parts import ReasoningPart
+
+    _install_sync_chat(
+        mock_ollama_client,
+        chunks=[
+            _ollama_chunk(thinking="Let me think..."),
+            _ollama_chunk("Final answer", done=True, usage=True),
+        ],
+    )
+
+    response = get_model("deepseek-r1:70b").prompt("Dummy Prompt")
+    assert response.text() == "Final answer"
+
+    parts = response.messages()[-1].parts
+    reasoning = [p for p in parts if isinstance(p, ReasoningPart)]
+    assert len(reasoning) == 1
+    assert reasoning[0].text == "Let me think..."
+
+
+def test_hide_reasoning_suppresses_reasoning_events(mocker, mock_ollama_client):
+    """prompt.hide_reasoning drops reasoning events without altering the request."""
+    from llm.parts import ReasoningPart
+
+    client = _install_sync_chat(
+        mock_ollama_client,
+        chunks=[
+            _ollama_chunk(thinking="Let me think..."),
+            _ollama_chunk("Final answer", done=True, usage=True),
+        ],
+    )
+
+    response = get_model("deepseek-r1:70b").prompt(
+        "Dummy Prompt",
+        hide_reasoning=True,
+        think=True,
+    )
+    assert response.text() == "Final answer"
+    parts = response.messages()[-1].parts
+    assert not any(isinstance(p, ReasoningPart) for p in parts)
+    # Request still asks the model to think — hide_reasoning only suppresses display.
+    _, kwargs = client.chat.call_args
+    assert kwargs.get("think") is True
