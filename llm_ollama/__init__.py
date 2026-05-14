@@ -1,19 +1,20 @@
+import json
 import os
 import warnings
 from collections import defaultdict
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass, field
 
 import llm
 import ollama
 from llm.parts import (
     AttachmentPart,
     ReasoningPart,
+    StreamEvent,
     TextPart,
     ToolCallPart,
     ToolResultPart,
 )
-from llm.utils import dicts_to_table_string
+from llm.utils import dicts_to_table_string, monotonic_ulid
 from ollama._utils import convert_function_to_tool
 from pydantic import Field, TypeAdapter, ValidationError
 
@@ -264,33 +265,56 @@ class _SharedOllama:
             kwargs["tools"] = [_llm_tool_to_ollama_tool(tool) for tool in prompt.tools]
         return options, kwargs
 
-    @staticmethod
-    def _interpret_chunk(chunk: ollama.ChatResponse) -> "_ChunkResult":
-        """Translate one Ollama chat chunk (streaming or non-streaming) into the pieces
-        the pump needs to emit: text to yield, tool calls to record, and usage to
-        register on completion.
+    def _interpret_chunk(
+        self,
+        chunk: ollama.ChatResponse,
+        response: "llm.Response | llm.AsyncResponse",
+    ) -> tuple[list[StreamEvent], dict | None]:
+        """Translate one Ollama chat chunk (streaming or non-streaming) into a list
+        of StreamEvents to yield and an optional usage dict to register at end of
+        stream.
+
+        Side effect: registers each captured tool call on ``response`` via
+        ``add_tool_call`` with the same synthesized ``tool_call_id`` carried on
+        the emitted events. The framework dedups by id when assembling parts,
+        so the call survives in ``response.tool_calls()`` while also taking part
+        in the StreamEvent ordering used by ``response.stream_events()`` and
+        ``response.to_dict()``.
         """
-        result = _ChunkResult(text=chunk.message.content or "")
+        events: list[StreamEvent] = []
+        if chunk.message.content:
+            events.append(StreamEvent(type="text", chunk=chunk.message.content))
         for tool_call in chunk.message.tool_calls or ():
-            result.tool_calls.append(
-                llm.ToolCall(
-                    name=tool_call.function.name,
-                    arguments=dict(tool_call.function.arguments),
+            tool_call_id = f"tc_{str(monotonic_ulid()).lower()}"
+            arguments = dict(tool_call.function.arguments or {})
+            events.append(
+                StreamEvent(
+                    type="tool_call_name",
+                    chunk=tool_call.function.name,
+                    tool_call_id=tool_call_id,
                 ),
             )
+            events.append(
+                StreamEvent(
+                    type="tool_call_args",
+                    chunk=json.dumps(arguments),
+                    tool_call_id=tool_call_id,
+                ),
+            )
+            response.add_tool_call(
+                llm.ToolCall(
+                    name=tool_call.function.name,
+                    arguments=arguments,
+                    tool_call_id=tool_call_id,
+                ),
+            )
+        usage = None
         if chunk.done:
-            result.usage = {
+            usage = {
                 "prompt_tokens": chunk.prompt_eval_count,
                 "completion_tokens": chunk.eval_count,
             }
-        return result
-
-
-@dataclass
-class _ChunkResult:
-    text: str = ""
-    tool_calls: list[llm.ToolCall] = field(default_factory=list)
-    usage: dict | None = None
+        return events, usage
 
 
 class Ollama(_SharedOllama, llm.Model):
@@ -314,12 +338,10 @@ class Ollama(_SharedOllama, llm.Model):
                 **kwargs,
             )
             for chunk in response_stream:
-                result = self._interpret_chunk(chunk)
-                for tool_call in result.tool_calls:
-                    response.add_tool_call(tool_call)
-                if result.usage is not None:
-                    usage = result.usage
-                yield result.text
+                events, chunk_usage = self._interpret_chunk(chunk, response)
+                if chunk_usage is not None:
+                    usage = chunk_usage
+                yield from events
         else:
             ollama_response = get_client().chat(
                 model=self.model_id,
@@ -328,11 +350,8 @@ class Ollama(_SharedOllama, llm.Model):
                 **kwargs,
             )
             response.response_json = ollama_response.model_dump()
-            result = self._interpret_chunk(ollama_response)
-            usage = result.usage
-            yield result.text
-            for tool_call in result.tool_calls:
-                response.add_tool_call(tool_call)
+            events, usage = self._interpret_chunk(ollama_response, response)
+            yield from events
         self.set_usage(response, usage)
 
 
@@ -343,7 +362,7 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
         stream: bool,
         response: llm.AsyncResponse,
         conversation: llm.AsyncConversation | None = None,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[StreamEvent, None]:
         """Execute the Ollama model asynchronously.
 
         Parameters
@@ -371,12 +390,11 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                 **kwargs,
             )
             async for chunk in response_stream:
-                result = self._interpret_chunk(chunk)
-                for tool_call in result.tool_calls:
-                    response.add_tool_call(tool_call)
-                if result.usage is not None:
-                    usage = result.usage
-                yield result.text
+                events, chunk_usage = self._interpret_chunk(chunk, response)
+                if chunk_usage is not None:
+                    usage = chunk_usage
+                for event in events:
+                    yield event
         else:
             ollama_response = await get_async_client().chat(
                 model=self.model_id,
@@ -385,11 +403,9 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                 **kwargs,
             )
             response.response_json = ollama_response.model_dump()
-            result = self._interpret_chunk(ollama_response)
-            usage = result.usage
-            yield result.text
-            for tool_call in result.tool_calls:
-                response.add_tool_call(tool_call)
+            events, usage = self._interpret_chunk(ollama_response, response)
+            for event in events:
+                yield event
         self.set_usage(response, usage)
 
 
