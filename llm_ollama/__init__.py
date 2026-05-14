@@ -61,7 +61,7 @@ def register_tools(register):
 
 
 @llm.hookimpl
-def register_models(register):
+def register_models(register, model_aliases=None):
     models = defaultdict(list)
     for model in _get_ollama_models():
         name, digest = model["model"], model["digest"]
