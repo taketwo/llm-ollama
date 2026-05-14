@@ -446,3 +446,79 @@ def test_hide_reasoning_suppresses_reasoning_events(mocker, mock_ollama_client):
     # Request still asks the model to think — hide_reasoning only suppresses display.
     _, kwargs = client.chat.call_args
     assert kwargs.get("think") is True
+
+
+def test_tool_call_reply_round_trip(mocker, mock_ollama_client):
+    """response.reply() round-trips a tool call + result back into the next request."""
+    from llm import ToolResult
+
+    mock_ollama_client.chat.side_effect = [
+        iter(
+            [
+                _ollama_chunk(tool_calls=[("multiply", {"a": 6, "b": 7})]),
+                _ollama_chunk("", done=True, usage=True),
+            ],
+        ),
+        iter(
+            [
+                _ollama_chunk("The answer is 42", done=True, usage=True),
+            ],
+        ),
+    ]
+
+    first = get_model("llama2:7b").prompt("What is 6 times 7?")
+    first.text()
+    tool_calls = first.tool_calls()
+    assert len(tool_calls) == 1
+    assert tool_calls[0].tool_call_id is not None
+
+    second = first.reply(
+        tool_results=[
+            ToolResult(
+                name="multiply",
+                output="42",
+                tool_call_id=tool_calls[0].tool_call_id,
+            ),
+        ],
+    )
+    assert second.text() == "The answer is 42"
+
+    # Verify the second turn's chat call carried the assistant tool_call and the
+    # tool result back to Ollama in wire format.
+    second_call_messages = mock_ollama_client.chat.call_args_list[1].kwargs["messages"]
+    roles = [m["role"] for m in second_call_messages]
+    assert roles == ["user", "assistant", "tool"]
+    assistant_msg = second_call_messages[1]
+    assert assistant_msg["tool_calls"]
+    assert assistant_msg["tool_calls"][0].function.name == "multiply"
+    assert assistant_msg["tool_calls"][0].function.arguments == {"a": 6, "b": 7}
+    tool_msg = second_call_messages[2]
+    assert tool_msg == {"role": "tool", "content": "42", "name": "multiply"}
+
+
+def test_build_messages_handles_multi_attachment_history(mock_ollama_client):
+    """A conversation with attachments across turns survives the new Part chain."""
+    from pathlib import Path
+
+    from llm import Attachment
+
+    png_bytes = (Path(__file__).parent / "data" / "box.png").read_bytes()
+    att_a = Attachment(content=png_bytes, type="image/png")
+    att_b = Attachment(content=png_bytes + b"\x00", type="image/png")
+
+    model = get_model("llama2:7b")
+    conversation = model.conversation()
+
+    mock_ollama_client.chat.side_effect = [
+        iter([_ollama_chunk("first reply", done=True, usage=True)]),
+        iter([_ollama_chunk("second reply", done=True, usage=True)]),
+    ]
+
+    conversation.prompt("look at this", attachments=[att_a]).text()
+    conversation.prompt("and this", attachments=[att_b]).text()
+
+    second_messages = mock_ollama_client.chat.call_args_list[1].kwargs["messages"]
+    user_messages = [m for m in second_messages if m["role"] == "user"]
+    assert len(user_messages) == 2
+    assert user_messages[0]["images"] == [att_a.base64_content()]
+    assert user_messages[1]["images"] == [att_b.base64_content()]
