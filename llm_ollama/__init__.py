@@ -6,6 +6,13 @@ from dataclasses import dataclass, field
 
 import llm
 import ollama
+from llm.parts import (
+    AttachmentPart,
+    ReasoningPart,
+    TextPart,
+    ToolCallPart,
+    ToolResultPart,
+)
 from llm.utils import dicts_to_table_string
 from ollama._utils import convert_function_to_tool
 from pydantic import Field, TypeAdapter, ValidationError
@@ -171,43 +178,61 @@ class _SharedOllama:
         return f"Ollama: {self.model_id}"
 
     def build_messages(self, prompt, conversation):
-        messages = []
-        if not conversation:
-            if prompt.system:
-                messages.append({"role": "system", "content": prompt.system})
-            messages.extend(_build_user_message(prompt))
-            return messages
+        # `conversation` is unused: under the llm 0.32 contract the framework
+        # pre-bakes prior turns into prompt.messages, so walking conversation
+        # here would double-emit history. The argument stays on the signature
+        # for API compatibility.
+        del conversation
 
-        current_system = None
-        for prev_response in conversation.responses:
-            if (
-                prev_response.prompt.system
-                and prev_response.prompt.system != current_system
-            ):
+        messages: list[dict] = []
+        for message in prompt.messages:
+            text_chunks: list[str] = []
+            images: list[str] = []
+            tool_calls: list[ollama.Message.ToolCall] = []
+            tool_results: list[ToolResultPart] = []
+            for part in message.parts:
+                if isinstance(part, TextPart):
+                    text_chunks.append(part.text)
+                elif isinstance(part, AttachmentPart):
+                    if part.attachment is not None:
+                        images.append(part.attachment.base64_content())
+                elif isinstance(part, ToolCallPart):
+                    tool_calls.append(
+                        ollama.Message.ToolCall(
+                            function=ollama.Message.ToolCall.Function(
+                                name=part.name,
+                                arguments=part.arguments or {},
+                            ),
+                        ),
+                    )
+                elif isinstance(part, ToolResultPart):
+                    tool_results.append(part)
+                elif isinstance(part, ReasoningPart):
+                    # Ollama does not accept reasoning input back; thinking
+                    # models keep their own state. Drop silently.
+                    continue
+
+            # ToolResultParts always become standalone {"role": "tool", ...}
+            # messages on the wire — Ollama keys them by tool name, not by
+            # being grouped into a parent message.
+            for tool_result in tool_results:
                 messages.append(
-                    {"role": "system", "content": prev_response.prompt.system},
+                    {
+                        "role": "tool",
+                        "content": tool_result.output,
+                        "name": tool_result.name,
+                    },
                 )
-                current_system = prev_response.prompt.system
-            messages.extend(
-                _build_tool_result_messages(prev_response.prompt.tool_results)
-            )
-            messages.extend(_build_user_message(prev_response.prompt))
-            assistant_message = {
-                "role": "assistant",
-                "content": prev_response.text_or_raise(),
-            }
-            # Replaying the calls is what keeps the tool results above anchored: with
-            # no record of having requested them, the model just calls the tool again.
-            if tool_calls := [
-                {"function": {"name": call.name, "arguments": call.arguments or {}}}
-                for call in prev_response.tool_calls_or_raise()
-            ]:
-                assistant_message["tool_calls"] = tool_calls
-            messages.append(assistant_message)
-        if prompt.system and prompt.system != current_system:
-            messages.append({"role": "system", "content": prompt.system})
-        messages.extend(_build_tool_result_messages(prompt.tool_results))
-        messages.extend(_build_user_message(prompt))
+
+            if not text_chunks and not images and not tool_calls:
+                continue
+
+            wire: dict = {"role": message.role, "content": "".join(text_chunks)}
+            if images:
+                wire["images"] = images
+            if tool_calls:
+                wire["tool_calls"] = tool_calls
+            messages.append(wire)
 
         return messages
 
@@ -461,57 +486,6 @@ def _get_ollama_model_capabilities(digest: str, model: str) -> list[str]:
 
     """
     return get_client().show(model).capabilities or []
-
-
-def _build_user_message(prompt) -> list[dict]:
-    """Build the ``user`` message for a prompt, if it has any content.
-
-    A tool-continuation prompt carries no text of its own; emitting an empty user
-    message for it would separate the assistant turn from its tool results.
-
-    Parameters
-    ----------
-    prompt : llm.Prompt
-        The prompt to render.
-
-    Returns
-    -------
-    list[dict]
-        A single user message, or nothing when the prompt is empty.
-
-    """
-    if not prompt.prompt and not prompt.attachments:
-        return []
-    message = {"role": "user", "content": prompt.prompt}
-    if prompt.attachments:
-        message["images"] = [
-            attachment.base64_content() for attachment in prompt.attachments
-        ]
-    return [message]
-
-
-def _build_tool_result_messages(tool_results) -> list[dict]:
-    """Convert llm tool results into Ollama ``tool`` role messages.
-
-    Parameters
-    ----------
-    tool_results : list[llm.ToolResult]
-        Tool results attached to a prompt.
-
-    Returns
-    -------
-    list[dict]
-        One message per tool result.
-
-    """
-    return [
-        {
-            "role": "tool",
-            "content": tool_result.output,
-            "name": tool_result.name,
-        }
-        for tool_result in tool_results
-    ]
 
 
 def _llm_tool_to_ollama_tool(tool: llm.Tool) -> ollama.Tool:
