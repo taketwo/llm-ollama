@@ -475,8 +475,10 @@ def _get_ollama_model_capabilities(digest: str, model: str) -> list[str]:
 def _llm_tool_to_ollama_tool(tool: llm.Tool) -> ollama.Tool:
     """Convert an llm.Tool to an ollama.Tool.
 
-    Uses ollama's convert_function_to_tool to properly convert the function
-    signature to a schema that matches ollama's expectations.
+    Uses ollama's convert_function_to_tool for the initial conversion, then
+    overrides the parameters with tool.input_schema when it contains properties.
+    This handles tools whose implementation is **kwargs-bound and carries the
+    real parameter schema in input_schema rather than the function signature.
 
     Parameters
     ----------
@@ -492,8 +494,22 @@ def _llm_tool_to_ollama_tool(tool: llm.Tool) -> ollama.Tool:
     assert tool.implementation is not None
     ollama_tool = convert_function_to_tool(tool.implementation)
     assert ollama_tool.function is not None
-    if tool.name != getattr(tool.implementation, "__name__", None):
-        ollama_tool.function.name = tool.name
+    ollama_tool.function.name = tool.name
     if tool.description:
         ollama_tool.function.description = tool.description
+    if tool.input_schema.get("properties"):
+        ollama_tool.function.parameters = ollama.Tool.Function.Parameters(
+            type=tool.input_schema.get("type"),
+            required=tool.input_schema.get("required"),
+            properties={
+                k: ollama.Tool.Function.Parameters.Property(
+                    **{
+                        f: v
+                        for f, v in p.items()
+                        if f in ("type", "description", "enum", "items")
+                    },
+                )
+                for k, p in tool.input_schema["properties"].items()
+            },
+        )
     return ollama_tool

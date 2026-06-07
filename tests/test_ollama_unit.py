@@ -1,5 +1,6 @@
 from unittest.mock import AsyncMock, Mock
 
+import llm
 import ollama
 import pytest
 from httpx import ConnectError
@@ -12,7 +13,7 @@ from llm import (
 )
 from llm.plugins import load_plugins, pm
 
-from llm_ollama import Ollama, OllamaEmbed
+from llm_ollama import Ollama, OllamaEmbed, _llm_tool_to_ollama_tool
 
 
 @pytest.fixture
@@ -335,3 +336,59 @@ async def test_async_non_streaming_captures_tool_calls(
 
     assert len(tool_calls) == 1
     _assert_tool_call(tool_calls[0], "multiply", {"a": 6, "b": 7})
+
+
+def _make_kwargs_tool(name="sql_query", description="Run a SQL query"):
+    def _impl(**kwargs):
+        pass
+
+    return llm.Tool(
+        name=name,
+        description=description,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "database": {"type": "string", "description": "Database name"},
+                "sql": {"type": "string", "description": "SQL to execute"},
+                "display": {"type": "string", "enum": ["rows", "csv", "both"]},
+            },
+            "required": ["database", "sql"],
+        },
+        implementation=_impl,
+    )
+
+
+def test_tool_conversion_typed_signature():
+    def multiply(a: int, b: int) -> int:
+        """Multiply two numbers."""
+        return a * b
+
+    tool = llm.Tool.function(multiply)
+    ollama_tool = _llm_tool_to_ollama_tool(tool)
+
+    assert ollama_tool.function.name == "multiply"
+    assert ollama_tool.function.description == "Multiply two numbers."
+    params = ollama_tool.function.parameters
+    assert set(params.properties.keys()) == {"a", "b"}
+    assert params.properties["a"].type == "integer"
+    assert params.properties["b"].type == "integer"
+
+
+def test_tool_conversion_kwargs_uses_input_schema():
+    ollama_tool = _llm_tool_to_ollama_tool(_make_kwargs_tool())
+
+    assert ollama_tool.function.name == "sql_query"
+    assert ollama_tool.function.description == "Run a SQL query"
+    params = ollama_tool.function.parameters
+    assert set(params.properties.keys()) == {"database", "sql", "display"}
+    assert params.properties["database"].type == "string"
+    assert params.properties["display"].enum == ["rows", "csv", "both"]
+    assert params.required == ["database", "sql"]
+
+
+def test_tool_conversion_name_and_description_override():
+    tool = _make_kwargs_tool(name="custom_name", description="Custom description")
+    ollama_tool = _llm_tool_to_ollama_tool(tool)
+
+    assert ollama_tool.function.name == "custom_name"
+    assert ollama_tool.function.description == "Custom description"
