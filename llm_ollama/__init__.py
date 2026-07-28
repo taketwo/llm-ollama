@@ -250,7 +250,7 @@ class _SharedOllama:
             result.tool_calls.append(
                 llm.ToolCall(
                     name=tool_call.function.name,
-                    arguments=tool_call.function.arguments,
+                    arguments=dict(tool_call.function.arguments),
                 ),
             )
         if chunk.done:
