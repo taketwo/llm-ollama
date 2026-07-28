@@ -105,10 +105,12 @@ To utilize an async model, retrieve it using `llm.get_async_model()` function in
 ```python
 import asyncio, llm
 
+
 async def run():
     model = llm.get_async_model("llama3.2:latest")
     response = model.prompt("A short poem about tea")
     print(await response.text())
+
 
 asyncio.run(run())
 ```
