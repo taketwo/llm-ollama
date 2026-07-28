@@ -175,11 +175,7 @@ class _SharedOllama:
         if not conversation:
             if prompt.system:
                 messages.append({"role": "system", "content": prompt.system})
-            messages.append({"role": "user", "content": prompt.prompt})
-            if prompt.attachments:
-                messages[-1]["images"] = [
-                    attachment.base64_content() for attachment in prompt.attachments
-                ]
+            messages.extend(_build_user_message(prompt))
             return messages
 
         current_system = None
@@ -192,31 +188,26 @@ class _SharedOllama:
                     {"role": "system", "content": prev_response.prompt.system},
                 )
                 current_system = prev_response.prompt.system
-            messages.append({"role": "user", "content": prev_response.prompt.prompt})
-            if prev_response.prompt.attachments:
-                messages[-1]["images"] = [
-                    attachment.base64_content()
-                    for attachment in prev_response.prompt.attachments
-                ]
-
-            messages.append(
-                {"role": "assistant", "content": prev_response.text_or_raise()}
+            messages.extend(
+                _build_tool_result_messages(prev_response.prompt.tool_results)
             )
+            messages.extend(_build_user_message(prev_response.prompt))
+            assistant_message = {
+                "role": "assistant",
+                "content": prev_response.text_or_raise(),
+            }
+            # Replaying the calls is what keeps the tool results above anchored: with
+            # no record of having requested them, the model just calls the tool again.
+            if tool_calls := [
+                {"function": {"name": call.name, "arguments": call.arguments or {}}}
+                for call in prev_response.tool_calls_or_raise()
+            ]:
+                assistant_message["tool_calls"] = tool_calls
+            messages.append(assistant_message)
         if prompt.system and prompt.system != current_system:
             messages.append({"role": "system", "content": prompt.system})
-        messages.append({"role": "user", "content": prompt.prompt})
-        if prompt.attachments:
-            messages[-1]["images"] = [
-                attachment.base64_content() for attachment in prompt.attachments
-            ]
-        messages.extend(
-            {
-                "role": "tool",
-                "content": tool_result.output,
-                "name": tool_result.name,
-            }
-            for tool_result in prompt.tool_results
-        )
+        messages.extend(_build_tool_result_messages(prompt.tool_results))
+        messages.extend(_build_user_message(prompt))
 
         return messages
 
@@ -470,6 +461,57 @@ def _get_ollama_model_capabilities(digest: str, model: str) -> list[str]:
 
     """
     return get_client().show(model).capabilities or []
+
+
+def _build_user_message(prompt) -> list[dict]:
+    """Build the ``user`` message for a prompt, if it has any content.
+
+    A tool-continuation prompt carries no text of its own; emitting an empty user
+    message for it would separate the assistant turn from its tool results.
+
+    Parameters
+    ----------
+    prompt : llm.Prompt
+        The prompt to render.
+
+    Returns
+    -------
+    list[dict]
+        A single user message, or nothing when the prompt is empty.
+
+    """
+    if not prompt.prompt and not prompt.attachments:
+        return []
+    message = {"role": "user", "content": prompt.prompt}
+    if prompt.attachments:
+        message["images"] = [
+            attachment.base64_content() for attachment in prompt.attachments
+        ]
+    return [message]
+
+
+def _build_tool_result_messages(tool_results) -> list[dict]:
+    """Convert llm tool results into Ollama ``tool`` role messages.
+
+    Parameters
+    ----------
+    tool_results : list[llm.ToolResult]
+        Tool results attached to a prompt.
+
+    Returns
+    -------
+    list[dict]
+        One message per tool result.
+
+    """
+    return [
+        {
+            "role": "tool",
+            "content": tool_result.output,
+            "name": tool_result.name,
+        }
+        for tool_result in tool_results
+    ]
 
 
 def _llm_tool_to_ollama_tool(tool: llm.Tool) -> ollama.Tool:
