@@ -10,20 +10,20 @@ dependencies = ["llm>=0.28", "ollama>=0.6.0", "pydantic>=2"]
 requires-python = ">=3.10"
 
 [project.urls]
-Homepage = "https://github.com/taketwo/llm-ollama"
-Changelog = "https://github.com/taketwo/llm-ollama/releases"
-Issues = "https://github.com/taketwo/llm-ollama/issues"
 CI = "https://github.com/taketwo/llm-ollama/actions"
+Changelog = "https://github.com/taketwo/llm-ollama/releases"
+Homepage = "https://github.com/taketwo/llm-ollama"
+Issues = "https://github.com/taketwo/llm-ollama/issues"
 
 [project.entry-points.llm]
 ollama = "llm_ollama"
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-asyncio", "pytest-cov", "pytest-mock"]
 lint = ["ruff", "ty"]
-
-[tool.setuptools.packages.find]
-include = ["llm_ollama*"]
+test = ["pytest", "pytest-asyncio", "pytest-cov", "pytest-mock"]
 
 [dependency-groups]
 dev = ["typing-extensions>=4.15.0"]
+
+[tool.setuptools.packages.find]
+include = ["llm_ollama*"]
