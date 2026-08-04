@@ -13,7 +13,12 @@ from llm import (
 )
 from llm.plugins import load_plugins, pm
 
-from llm_ollama import Ollama, OllamaEmbed, _llm_tool_to_ollama_tool
+from llm_ollama import (
+    Ollama,
+    OllamaEmbed,
+    _llm_tool_to_ollama_tool,
+)
+from llm_ollama.retry import ollama_error_message
 
 
 @pytest.fixture
@@ -99,10 +104,12 @@ def _ollama_chunk(content="", *, tool_calls=None, done=False, usage=False):
     )
 
 
-def _install_async_chat(mocker, *, chunks=None, response=None):
+def _install_async_chat(mocker, *, chunks=None, response=None, side_effect=None):
     """Mock ollama.AsyncClient.chat for streaming or non-streaming calls."""
     client = AsyncMock()
-    if chunks is not None:
+    if side_effect is not None:
+        client.chat.side_effect = side_effect
+    elif chunks is not None:
 
         async def mock_chat(*_args, **_kwargs):
             for chunk in chunks:
@@ -115,11 +122,16 @@ def _install_async_chat(mocker, *, chunks=None, response=None):
     return client
 
 
-def _install_sync_chat(mock_ollama_client, *, chunks=None, response=None):
+def _install_sync_chat(
+    mock_ollama_client, *, chunks=None, response=None, side_effect=None
+):
     """Mock ollama.Client.chat for streaming or non-streaming calls."""
-    mock_ollama_client.chat.return_value = (
-        iter(chunks) if chunks is not None else response
-    )
+    if side_effect is not None:
+        mock_ollama_client.chat.side_effect = side_effect
+    else:
+        mock_ollama_client.chat.return_value = (
+            iter(chunks) if chunks is not None else response
+        )
     return mock_ollama_client
 
 
@@ -256,7 +268,7 @@ async def test_async_streaming_yields_text(mocker, mock_ollama_client):
     response = get_async_model("llama2:7b").prompt("Dummy Prompt")
 
     assert await response.text() == "Test response 1Test response 2"
-    client.chat.assert_called_once()
+    client.chat.assert_awaited_once()
 
 
 def test_sync_streaming_captures_tool_calls(mocker, mock_ollama_client):
@@ -280,7 +292,7 @@ def test_sync_streaming_captures_tool_calls(mocker, mock_ollama_client):
 @pytest.mark.asyncio
 async def test_async_streaming_captures_tool_calls(mocker, mock_ollama_client):
     """Streamed chunks carrying tool_calls register on the async response."""
-    _install_async_chat(
+    client = _install_async_chat(
         mocker,
         chunks=[
             _ollama_chunk(tool_calls=[("multiply", {"a": 6, "b": 7})]),
@@ -294,6 +306,7 @@ async def test_async_streaming_captures_tool_calls(mocker, mock_ollama_client):
 
     assert len(tool_calls) == 1
     _assert_tool_call(tool_calls[0], "multiply", {"a": 6, "b": 7})
+    client.chat.assert_awaited_once()
 
 
 def test_sync_non_streaming_captures_tool_calls(mocker, mock_ollama_client):
@@ -321,7 +334,7 @@ async def test_async_non_streaming_captures_tool_calls(
     mock_ollama_client,
 ):
     """A non-streamed async response carrying tool_calls registers on the response."""
-    _install_async_chat(
+    client = _install_async_chat(
         mocker,
         response=_ollama_chunk(
             tool_calls=[("multiply", {"a": 6, "b": 7})],
@@ -336,6 +349,7 @@ async def test_async_non_streaming_captures_tool_calls(
 
     assert len(tool_calls) == 1
     _assert_tool_call(tool_calls[0], "multiply", {"a": 6, "b": 7})
+    client.chat.assert_awaited_once()
 
 
 def _make_kwargs_tool(name="sql_query", description="Run a SQL query"):
@@ -392,3 +406,131 @@ def test_tool_conversion_name_and_description_override():
 
     assert ollama_tool.function.name == "custom_name"
     assert ollama_tool.function.description == "Custom description"
+
+
+class TestOllamaErrorHandling:
+    """Behaviour around transient HTTP errors from the Ollama server."""
+
+    def test_410_gone_warns_and_yields_empty_response_sync(
+        self, mocker, mock_ollama_client, capsys
+    ):
+        """A 410 during a sync chat should log a warning and not crash the session."""
+        _install_sync_chat(
+            mock_ollama_client,
+            side_effect=ollama.ResponseError("model is gone", status_code=410),
+        )
+
+        response = get_model("llama2:7b").prompt("Hello", stream=False)
+        text = response.text()
+
+        assert text == ""
+        captured = capsys.readouterr()
+        assert captured.err
+        assert "410" in captured.err or "gone" in captured.err.lower()
+
+    @pytest.mark.asyncio
+    async def test_410_gone_warns_and_yields_empty_response_async(
+        self, mocker, mock_ollama_client, capsys
+    ):
+        """A 410 during an async chat should log a warning and not crash the session."""
+        client = _install_async_chat(
+            mocker,
+            side_effect=ollama.ResponseError("model is gone", status_code=410),
+        )
+
+        response = get_async_model("llama2:7b").prompt("Hello", stream=False)
+        text = await response.text()
+
+        assert text == ""
+        captured = capsys.readouterr()
+        assert captured.err
+        assert "410" in captured.err or "gone" in captured.err.lower()
+        client.chat.assert_awaited_once()
+
+    def test_429_retries_then_warns_sync(self, mocker, mock_ollama_client, capsys):
+        """A 429 should be retried a few times before giving up with a warning."""
+        _install_sync_chat(
+            mock_ollama_client,
+            side_effect=[
+                ollama.ResponseError("rate limited", status_code=429),
+                ollama.ResponseError("rate limited", status_code=429),
+                _ollama_chunk("ok", done=True, usage=True),
+            ],
+        )
+
+        response = get_model("llama2:7b").prompt("Hello", stream=False)
+        assert response.text() == "ok"
+        assert mock_ollama_client.chat.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_429_retries_then_warns_async(
+        self, mocker, mock_ollama_client, capsys
+    ):
+        """A 429 should be retried a few times before giving up with a warning."""
+        client = _install_async_chat(
+            mocker,
+            side_effect=[
+                ollama.ResponseError("rate limited", status_code=429),
+                _ollama_chunk("ok", done=True, usage=True),
+            ],
+        )
+
+        response = get_async_model("llama2:7b").prompt("Hello", stream=False)
+        assert await response.text() == "ok"
+        assert client.chat.await_count == 2
+
+    def test_5xx_retries_then_warns_sync(self, mocker, mock_ollama_client, capsys):
+        """500 class errors should be retried with best-of-5 semantics."""
+        _install_sync_chat(
+            mock_ollama_client,
+            side_effect=[
+                ollama.ResponseError("overloaded", status_code=503),
+                ollama.ResponseError("bad gateway", status_code=502),
+                ollama.ResponseError("server error", status_code=500),
+                _ollama_chunk("ok", done=True, usage=True),
+            ],
+        )
+
+        response = get_model("llama2:7b").prompt("Hello", stream=False)
+        assert response.text() == "ok"
+        assert mock_ollama_client.chat.call_count == 4
+
+    @pytest.mark.asyncio
+    async def test_5xx_retries_then_warns_async(
+        self, mocker, mock_ollama_client, capsys
+    ):
+        """500 class errors should be retried with best-of-5 semantics."""
+        client = _install_async_chat(
+            mocker,
+            side_effect=[
+                ollama.ResponseError("gateway timeout", status_code=504),
+                ollama.ResponseError("not implemented", status_code=501),
+                _ollama_chunk("ok", done=True, usage=True),
+            ],
+        )
+
+        response = get_async_model("llama2:7b").prompt("Hello", stream=False)
+        assert await response.text() == "ok"
+        assert client.chat.await_count == 3
+
+    def test_410_not_retried_sync(self, mocker, mock_ollama_client):
+        """410 is permanent; we should not retry it."""
+        _install_sync_chat(
+            mock_ollama_client,
+            side_effect=ollama.ResponseError("model is gone", status_code=410),
+        )
+
+        response = get_model("llama2:7b").prompt("Hello", stream=False)
+        assert response.text() == ""
+        assert mock_ollama_client.chat.call_count == 1
+
+    def test_error_message_extraction(self):
+        assert (
+            ollama_error_message(ollama.ResponseError("oops", status_code=500))
+            == "oops"
+        )
+        assert "500" in ollama_error_message(
+            ollama.ResponseError("oops", status_code=500), include_status=True
+        )
+        assert ollama_error_message(ValueError("plain")) == "plain"
+        assert ollama_error_message(Exception()) == ""
