@@ -12,6 +12,12 @@ from pydantic import Field, TypeAdapter, ValidationError
 
 from llm_ollama.auth import get_async_client, get_client
 from llm_ollama.cache import Cache
+from llm_ollama.retry import (
+    OllamaGiveUp,
+    async_ollama_retry,
+    ollama_retry,
+    ollama_warn,
+)
 
 cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
 
@@ -281,33 +287,47 @@ class Ollama(_SharedOllama, llm.Model):
         options, kwargs = self._prepare_chat_kwargs(prompt)
         usage = None
         if stream:
-            response_stream = get_client().chat(
-                model=self.model_id,
-                messages=messages,
-                stream=True,
-                options=options,
-                **kwargs,
-            )
-            for chunk in response_stream:
-                result = self._interpret_chunk(chunk)
+            for attempt in ollama_retry(
+                lambda: get_client().chat(
+                    model=self.model_id,
+                    messages=messages,
+                    stream=True,
+                    options=options,
+                    **kwargs,
+                ),
+            ):
+                try:
+                    response_stream = attempt()
+                except OllamaGiveUp as give_up:
+                    ollama_warn(give_up.error, give_up.status_code)
+                    return
+                for chunk in response_stream:
+                    result = self._interpret_chunk(chunk)
+                    for tool_call in result.tool_calls:
+                        response.add_tool_call(tool_call)
+                    if result.usage is not None:
+                        usage = result.usage
+                    yield result.text
+        else:
+            for attempt in ollama_retry(
+                lambda: get_client().chat(
+                    model=self.model_id,
+                    messages=messages,
+                    options=options,
+                    **kwargs,
+                ),
+            ):
+                try:
+                    ollama_response = attempt()
+                except OllamaGiveUp as give_up:
+                    ollama_warn(give_up.error, give_up.status_code)
+                    return
+                response.response_json = ollama_response.model_dump()
+                result = self._interpret_chunk(ollama_response)
+                usage = result.usage
+                yield result.text
                 for tool_call in result.tool_calls:
                     response.add_tool_call(tool_call)
-                if result.usage is not None:
-                    usage = result.usage
-                yield result.text
-        else:
-            ollama_response = get_client().chat(
-                model=self.model_id,
-                messages=messages,
-                options=options,
-                **kwargs,
-            )
-            response.response_json = ollama_response.model_dump()
-            result = self._interpret_chunk(ollama_response)
-            usage = result.usage
-            yield result.text
-            for tool_call in result.tool_calls:
-                response.add_tool_call(tool_call)
         self.set_usage(response, usage)
 
 
@@ -338,33 +358,47 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
         options, kwargs = self._prepare_chat_kwargs(prompt)
         usage = None
         if stream:
-            response_stream = await get_async_client().chat(
-                model=self.model_id,
-                messages=messages,
-                stream=True,
-                options=options,
-                **kwargs,
-            )
-            async for chunk in response_stream:
-                result = self._interpret_chunk(chunk)
+            for attempt in async_ollama_retry(
+                lambda: get_async_client().chat(
+                    model=self.model_id,
+                    messages=messages,
+                    stream=True,
+                    options=options,
+                    **kwargs,
+                ),
+            ):
+                try:
+                    response_stream = await attempt()
+                except OllamaGiveUp as give_up:
+                    ollama_warn(give_up.error, give_up.status_code)
+                    return
+                async for chunk in response_stream:
+                    result = self._interpret_chunk(chunk)
+                    for tool_call in result.tool_calls:
+                        response.add_tool_call(tool_call)
+                    if result.usage is not None:
+                        usage = result.usage
+                    yield result.text
+        else:
+            for attempt in async_ollama_retry(
+                lambda: get_async_client().chat(
+                    model=self.model_id,
+                    messages=messages,
+                    options=options,
+                    **kwargs,
+                ),
+            ):
+                try:
+                    ollama_response = await attempt()
+                except OllamaGiveUp as give_up:
+                    ollama_warn(give_up.error, give_up.status_code)
+                    return
+                response.response_json = ollama_response.model_dump()
+                result = self._interpret_chunk(ollama_response)
+                usage = result.usage
+                yield result.text
                 for tool_call in result.tool_calls:
                     response.add_tool_call(tool_call)
-                if result.usage is not None:
-                    usage = result.usage
-                yield result.text
-        else:
-            ollama_response = await get_async_client().chat(
-                model=self.model_id,
-                messages=messages,
-                options=options,
-                **kwargs,
-            )
-            response.response_json = ollama_response.model_dump()
-            result = self._interpret_chunk(ollama_response)
-            usage = result.usage
-            yield result.text
-            for tool_call in result.tool_calls:
-                response.add_tool_call(tool_call)
         self.set_usage(response, usage)
 
 
