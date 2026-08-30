@@ -3,10 +3,10 @@ name = "llm-ollama"
 version = "0.16.2"
 description = "LLM plugin providing access to models running on an Ollama server"
 readme = "README.md"
-authors = [{ name = "Sergey Alexandrov" }]
-license = "Apache-2.0"
-dependencies = ["llm>=0.28", "ollama>=0.6.0", "pydantic>=2"]
 requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [{ name = "Sergey Alexandrov" }]
+dependencies = ["llm>=0.33", "ollama>=0.6.0", "pydantic>=2"]
 
 [project.urls]
 CI = "https://github.com/taketwo/llm-ollama/actions"
