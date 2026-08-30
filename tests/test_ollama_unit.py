@@ -13,7 +13,7 @@ from llm import (
 )
 from llm.plugins import load_plugins, pm
 
-from llm_ollama import Ollama, OllamaEmbed, _llm_tool_to_ollama_tool
+from llm_ollama import AsyncOllama, Ollama, OllamaEmbed, _llm_tool_to_ollama_tool
 
 
 @pytest.fixture
@@ -136,6 +136,11 @@ def _assert_tool_call(tc, name, arguments):
     assert tc.arguments == arguments
 
 
+def _assert_bearer_token(client_class, token):
+    _, kwargs = client_class.call_args
+    assert kwargs["headers"]["Authorization"] == f"Bearer {token}"
+
+
 def test_plugin_is_installed():
     load_plugins()
     names = [mod.__name__ for mod in pm.get_plugins()]
@@ -225,6 +230,52 @@ def test_model_embed(
 
     _, called_kwargs = client.embed.call_args
     assert called_kwargs.get("truncate") is expected_truncate_value
+
+
+def test_get_key_returns_none_when_no_key_is_configured(mocker):
+    """Ollama's key is optional, so resolution returns None instead of raising."""
+    mocker.patch("llm.get_key", return_value=None)
+
+    assert Ollama("llama2:7b").get_key() is None
+    assert OllamaEmbed("mxbai-embed-large:latest").get_key() is None
+
+
+def test_chat_key_reaches_client_as_bearer_token(mocker, bare_env):
+    """A per-call key travels from prompt() through to the client's auth header."""
+    client = Mock()
+    client.chat.return_value = iter([_ollama_chunk("ok", done=True, usage=True)])
+    client_class = mocker.patch("ollama.Client", return_value=client)
+
+    Ollama("llama2:7b").prompt("Dummy Prompt", key="caller-key").text()
+
+    _assert_bearer_token(client_class, "caller-key")
+
+
+@pytest.mark.asyncio
+async def test_async_chat_key_reaches_client_as_bearer_token(mocker, bare_env):
+    """The async client is built from the resolved key just as the sync one is."""
+
+    async def mock_chat(*_args, **_kwargs):
+        yield _ollama_chunk("ok", done=True, usage=True)
+
+    client = AsyncMock()
+    client.chat.return_value = mock_chat()
+    client_class = mocker.patch("ollama.AsyncClient", return_value=client)
+
+    await AsyncOllama("llama2:7b").prompt("Dummy Prompt", key="caller-key").text()
+
+    _assert_bearer_token(client_class, "caller-key")
+
+
+def test_embed_key_reaches_client_as_bearer_token(mocker, bare_env):
+    """A per-call key travels from embed() through to the client's auth header."""
+    client = Mock()
+    client.embed.return_value = {"embeddings": [[0.1]]}
+    client_class = mocker.patch("ollama.Client", return_value=client)
+
+    OllamaEmbed("mxbai-embed-large:latest").embed("string to embed", key="caller-key")
+
+    _assert_bearer_token(client_class, "caller-key")
 
 
 def test_registered_models_when_ollama_is_down(mocker):
