@@ -221,6 +221,12 @@ The API key is stored securely by `llm` and used automatically. Alternatively, y
 export OLLAMA_API_KEY=your-api-key
 ```
 
+A key can also be supplied per call with `--key`, which overrides both of the above:
+
+```bash
+llm -m gpt-oss:120b-cloud --key your-api-key "How much is 2+2?"
+```
+
 ## Development
 
 ### Setup

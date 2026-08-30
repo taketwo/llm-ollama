@@ -94,7 +94,11 @@ class TestClientCreation:
     def test_api_key_injected_as_bearer_token(self, client, mock_get_key):
         mock_get_key.return_value = "test-key"
         client.create()
-        mock_get_key.assert_called_once_with(alias="ollama", env="OLLAMA_API_KEY")
+        mock_get_key.assert_called_once_with(
+            input=None,
+            alias="ollama",
+            env="OLLAMA_API_KEY",
+        )
         client.cls.assert_called_once_with(
             timeout=ANY,
             headers={"Authorization": "Bearer test-key"},
@@ -111,6 +115,29 @@ class TestClientCreation:
         mock_get_key.return_value = "api-key"
         client.create()
         mock_get_key.assert_not_called()
+        client.cls.assert_called_once_with(
+            timeout=ANY,
+            headers={"Authorization": "Bearer explicit-token"},
+        )
+
+    def test_explicit_key_replaces_stored_key_lookup(self, client, mock_get_key):
+        """A caller-supplied key short-circuits the stored-alias lookup entirely."""
+        mock_get_key.return_value = "stored-key"
+        client.create("caller-key")
+        mock_get_key.assert_not_called()
+        client.cls.assert_called_once_with(
+            timeout=ANY,
+            headers={"Authorization": "Bearer caller-key"},
+        )
+
+    def test_ollama_headers_authorization_takes_precedence_over_explicit_key(
+        self,
+        client,
+        monkeypatch,
+    ):
+        """An explicit Authorization header outranks even a caller-supplied key."""
+        monkeypatch.setenv("OLLAMA_HEADERS", "Authorization=Bearer explicit-token")
+        client.create("caller-key")
         client.cls.assert_called_once_with(
             timeout=ANY,
             headers={"Authorization": "Bearer explicit-token"},

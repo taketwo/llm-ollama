@@ -18,17 +18,30 @@ if TYPE_CHECKING:
 DEFAULT_REQUEST_TIMEOUT = None
 CONNECT_TIMEOUT = 1.0
 
+# Sources an API key is resolved from, in llm's own precedence order
+KEY_ALIAS = "ollama"
+KEY_ENV_VAR = "OLLAMA_API_KEY"
+
 T = TypeVar("T", bound=ollama.Client | ollama.AsyncClient)
 
 
-def get_client() -> ollama.Client:
+def resolve_key(explicit_key: str | None = None) -> str | None:
+    """Resolve an API key from an explicit value, the stored alias, or the environment.
+
+    An Ollama key is optional (an authenticated server needs one, a local server does
+    not), so exhausting every source returns None rather than raising.
+    """
+    return llm.get_key(input=explicit_key, alias=KEY_ALIAS, env=KEY_ENV_VAR)
+
+
+def get_client(key: str | None = None) -> ollama.Client:
     """Create an Ollama client with host and authentication set based on OLLAMA_HOST."""
-    return _create_client(ollama.Client)
+    return _create_client(ollama.Client, key)
 
 
-def get_async_client() -> ollama.AsyncClient:
+def get_async_client(key: str | None = None) -> ollama.AsyncClient:
     """Create an asynchronous Ollama client with host and authentication set based on OLLAMA_HOST."""
-    return _create_client(ollama.AsyncClient)
+    return _create_client(ollama.AsyncClient, key)
 
 
 def _parse_auth_from_url(url: str) -> tuple[str, httpx.BasicAuth | None]:
@@ -100,12 +113,15 @@ class ClientParams(TypedDict):
     headers: "dict[str, str]"
 
 
-def _create_client(client_class: type[T]) -> T:
-    """Create a client with host, authentication, and headers set based on environment variables."""
+def _create_client(client_class: type[T], key: str | None = None) -> T:
+    """Create a client with host, authentication, and headers set based on environment variables.
+
+    An Authorization header set through OLLAMA_HEADERS wins over any resolved key.
+    """
     host, auth = _parse_auth_from_env()
     headers = _parse_headers_from_env()
     if not any(k.lower() == "authorization" for k in headers):
-        api_key = llm.get_key(alias="ollama", env="OLLAMA_API_KEY")
+        api_key = key or resolve_key()
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
     kwargs: ClientParams = {

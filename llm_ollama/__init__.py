@@ -18,7 +18,7 @@ from llm.utils import dicts_to_table_string, monotonic_ulid
 from ollama._utils import convert_function_to_tool
 from pydantic import Field, TypeAdapter, ValidationError
 
-from llm_ollama.auth import get_async_client, get_client
+from llm_ollama.auth import get_async_client, get_client, resolve_key
 from llm_ollama.cache import Cache
 
 cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
@@ -178,6 +178,9 @@ class _SharedOllama:
     def __str__(self) -> str:
         return f"Ollama: {self.model_id}"
 
+    def get_key(self, explicit_key: str | None = None) -> str | None:
+        return resolve_key(explicit_key)
+
     def build_messages(self, prompt, conversation):
         # `conversation` is unused: under the llm 0.32 contract the framework
         # pre-bakes prior turns into prompt.messages, so walking conversation
@@ -259,19 +262,21 @@ class _SharedOllama:
         return options, kwargs
 
 
-class Ollama(_SharedOllama, llm.Model):
+class Ollama(_SharedOllama, llm.KeyModel):
     def execute(
         self,
         prompt: llm.Prompt,
         stream: bool,
         response: llm.Response,
-        conversation=None,
+        conversation: llm.Conversation | None = None,
+        key: str | None = None,
     ):
         messages = self.build_messages(prompt, conversation)
         options, kwargs = self._prepare_chat_kwargs(prompt)
         accumulator = _ChunkAccumulator(response, hide_reasoning=prompt.hide_reasoning)
+        client = get_client(key=key)
         if stream:
-            response_stream = get_client().chat(
+            response_stream = client.chat(
                 model=self.model_id,
                 messages=messages,
                 stream=True,
@@ -281,7 +286,7 @@ class Ollama(_SharedOllama, llm.Model):
             for chunk in response_stream:
                 yield from accumulator.consume(chunk)
         else:
-            ollama_response = get_client().chat(
+            ollama_response = client.chat(
                 model=self.model_id,
                 messages=messages,
                 options=options,
@@ -291,13 +296,14 @@ class Ollama(_SharedOllama, llm.Model):
         accumulator.finalize()
 
 
-class AsyncOllama(_SharedOllama, llm.AsyncModel):
+class AsyncOllama(_SharedOllama, llm.AsyncKeyModel):
     async def execute(
         self,
         prompt: llm.Prompt,
         stream: bool,
         response: llm.AsyncResponse,
         conversation: llm.AsyncConversation | None = None,
+        key: str | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
         """Execute the Ollama model asynchronously.
 
@@ -316,8 +322,9 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
         messages = self.build_messages(prompt, conversation)
         options, kwargs = self._prepare_chat_kwargs(prompt)
         accumulator = _ChunkAccumulator(response, hide_reasoning=prompt.hide_reasoning)
+        client = get_async_client(key=key)
         if stream:
-            response_stream = await get_async_client().chat(
+            response_stream = await client.chat(
                 model=self.model_id,
                 messages=messages,
                 stream=True,
@@ -328,7 +335,7 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                 for event in accumulator.consume(chunk):
                     yield event
         else:
-            ollama_response = await get_async_client().chat(
+            ollama_response = await client.chat(
                 model=self.model_id,
                 messages=messages,
                 options=options,
@@ -362,8 +369,11 @@ class OllamaEmbed(llm.EmbeddingModel):
     def __str__(self) -> str:
         return f"Ollama: {self.model_id}"
 
-    def embed_batch(self, items):
-        result = get_client().embed(
+    def get_key(self, explicit_key: str | None = None) -> str | None:
+        return resolve_key(explicit_key)
+
+    def embed_batch(self, items, *, key: str | None = None):
+        result = get_client(key=key).embed(
             model=self.model_id,
             input=items,
             truncate=self.truncate,
