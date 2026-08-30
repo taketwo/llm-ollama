@@ -237,13 +237,6 @@ class _SharedOllama:
 
         return messages
 
-    def set_usage(self, response, usage):
-        if not usage:
-            return
-        input_tokens = usage.pop("prompt_tokens")
-        output_tokens = usage.pop("completion_tokens")
-        response.set_usage(input=input_tokens, output=output_tokens)
-
     def _prepare_chat_kwargs(self, prompt) -> tuple[dict, dict]:
         """Build the ``options`` and ``kwargs`` dicts for an Ollama chat call.
 
@@ -265,66 +258,6 @@ class _SharedOllama:
             kwargs["tools"] = [_llm_tool_to_ollama_tool(tool) for tool in prompt.tools]
         return options, kwargs
 
-    def _interpret_chunk(
-        self,
-        chunk: ollama.ChatResponse,
-        response: "llm.Response | llm.AsyncResponse",
-        *,
-        hide_reasoning: bool = False,
-    ) -> tuple[list[StreamEvent], dict | None]:
-        """Translate one Ollama chat chunk (streaming or non-streaming) into a list
-        of StreamEvents to yield and an optional usage dict to register at end of
-        stream.
-
-        Side effect: registers each captured tool call on ``response`` via
-        ``add_tool_call`` with the same synthesized ``tool_call_id`` carried on
-        the emitted events. The framework dedups by id when assembling parts,
-        so the call survives in ``response.tool_calls()`` while also taking part
-        in the StreamEvent ordering used by ``response.stream_events()`` and
-        ``response.to_dict()``.
-
-        ``hide_reasoning`` suppresses reasoning events without altering the
-        request: the model still thinks, only the visible trace is dropped. The
-        ``-o think`` option is the user-facing knob for actually disabling the
-        reasoning step.
-        """
-        events: list[StreamEvent] = []
-        if chunk.message.content:
-            events.append(StreamEvent(type="text", chunk=chunk.message.content))
-        if chunk.message.thinking and not hide_reasoning:
-            events.append(StreamEvent(type="reasoning", chunk=chunk.message.thinking))
-        for tool_call in chunk.message.tool_calls or ():
-            tool_call_id = f"tc_{str(monotonic_ulid()).lower()}"
-            arguments = dict(tool_call.function.arguments or {})
-            events.append(
-                StreamEvent(
-                    type="tool_call_name",
-                    chunk=tool_call.function.name,
-                    tool_call_id=tool_call_id,
-                ),
-            )
-            events.append(
-                StreamEvent(
-                    type="tool_call_args",
-                    chunk=json.dumps(arguments),
-                    tool_call_id=tool_call_id,
-                ),
-            )
-            response.add_tool_call(
-                llm.ToolCall(
-                    name=tool_call.function.name,
-                    arguments=arguments,
-                    tool_call_id=tool_call_id,
-                ),
-            )
-        usage = None
-        if chunk.done:
-            usage = {
-                "prompt_tokens": chunk.prompt_eval_count,
-                "completion_tokens": chunk.eval_count,
-            }
-        return events, usage
-
 
 class Ollama(_SharedOllama, llm.Model):
     def execute(
@@ -335,9 +268,8 @@ class Ollama(_SharedOllama, llm.Model):
         conversation=None,
     ):
         messages = self.build_messages(prompt, conversation)
-        response._prompt_json = {"messages": messages}
         options, kwargs = self._prepare_chat_kwargs(prompt)
-        usage = None
+        accumulator = _ChunkAccumulator(response, hide_reasoning=prompt.hide_reasoning)
         if stream:
             response_stream = get_client().chat(
                 model=self.model_id,
@@ -347,14 +279,7 @@ class Ollama(_SharedOllama, llm.Model):
                 **kwargs,
             )
             for chunk in response_stream:
-                events, chunk_usage = self._interpret_chunk(
-                    chunk,
-                    response,
-                    hide_reasoning=prompt.hide_reasoning,
-                )
-                if chunk_usage is not None:
-                    usage = chunk_usage
-                yield from events
+                yield from accumulator.consume(chunk)
         else:
             ollama_response = get_client().chat(
                 model=self.model_id,
@@ -362,14 +287,8 @@ class Ollama(_SharedOllama, llm.Model):
                 options=options,
                 **kwargs,
             )
-            response.response_json = ollama_response.model_dump()
-            events, usage = self._interpret_chunk(
-                ollama_response,
-                response,
-                hide_reasoning=prompt.hide_reasoning,
-            )
-            yield from events
-        self.set_usage(response, usage)
+            yield from accumulator.consume(ollama_response)
+        accumulator.finalize()
 
 
 class AsyncOllama(_SharedOllama, llm.AsyncModel):
@@ -395,9 +314,8 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
 
         """
         messages = self.build_messages(prompt, conversation)
-        response._prompt_json = {"messages": messages}
         options, kwargs = self._prepare_chat_kwargs(prompt)
-        usage = None
+        accumulator = _ChunkAccumulator(response, hide_reasoning=prompt.hide_reasoning)
         if stream:
             response_stream = await get_async_client().chat(
                 model=self.model_id,
@@ -407,14 +325,7 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                 **kwargs,
             )
             async for chunk in response_stream:
-                events, chunk_usage = self._interpret_chunk(
-                    chunk,
-                    response,
-                    hide_reasoning=prompt.hide_reasoning,
-                )
-                if chunk_usage is not None:
-                    usage = chunk_usage
-                for event in events:
+                for event in accumulator.consume(chunk):
                     yield event
         else:
             ollama_response = await get_async_client().chat(
@@ -423,15 +334,9 @@ class AsyncOllama(_SharedOllama, llm.AsyncModel):
                 options=options,
                 **kwargs,
             )
-            response.response_json = ollama_response.model_dump()
-            events, usage = self._interpret_chunk(
-                ollama_response,
-                response,
-                hide_reasoning=prompt.hide_reasoning,
-            )
-            for event in events:
+            for event in accumulator.consume(ollama_response):
                 yield event
-        self.set_usage(response, usage)
+        accumulator.finalize()
 
 
 class OllamaEmbed(llm.EmbeddingModel):
@@ -464,6 +369,90 @@ class OllamaEmbed(llm.EmbeddingModel):
             truncate=self.truncate,
         )
         yield from result["embeddings"]
+
+
+class _ChunkAccumulator:
+    """Turns Ollama chat chunks into StreamEvents and rebuilds the raw payload.
+
+    One accumulator serves one ``execute()`` call, whose response it holds and mutates.
+    Reassembling the streamed pieces gives ``response_json`` the same shape whether or
+    not the caller streamed.
+    """
+
+    def __init__(
+        self,
+        response: "llm.Response | llm.AsyncResponse",
+        *,
+        hide_reasoning: bool = False,
+    ) -> None:
+        self.response = response
+        self.hide_reasoning = hide_reasoning
+        self._content: list[str] = []
+        self._thinking: list[str] = []
+        self._tool_calls: list[dict] = []
+        self._final_chunk: ollama.ChatResponse | None = None
+
+    def consume(self, chunk: ollama.ChatResponse) -> list[StreamEvent]:
+        """Accumulate one chunk and return the StreamEvents it produces.
+
+        Registers any tool calls the chunk carries on the response.
+        """
+        events: list[StreamEvent] = []
+        if chunk.message.content:
+            self._content.append(chunk.message.content)
+            events.append(StreamEvent(type="text", chunk=chunk.message.content))
+        if chunk.message.thinking:
+            self._thinking.append(chunk.message.thinking)
+            if not self.hide_reasoning:
+                events.append(
+                    StreamEvent(type="reasoning", chunk=chunk.message.thinking),
+                )
+        for tool_call in chunk.message.tool_calls or ():
+            self._tool_calls.append(tool_call.model_dump())
+            tool_call_id = f"tc_{str(monotonic_ulid()).lower()}"
+            arguments = dict(tool_call.function.arguments or {})
+            events.append(
+                StreamEvent(
+                    type="tool_call_name",
+                    chunk=tool_call.function.name,
+                    tool_call_id=tool_call_id,
+                ),
+            )
+            events.append(
+                StreamEvent(
+                    type="tool_call_args",
+                    chunk=json.dumps(arguments),
+                    tool_call_id=tool_call_id,
+                ),
+            )
+            self.response.add_tool_call(
+                llm.ToolCall(
+                    name=tool_call.function.name,
+                    arguments=arguments,
+                    tool_call_id=tool_call_id,
+                ),
+            )
+        if chunk.done:
+            self._final_chunk = chunk
+        return events
+
+    def finalize(self) -> None:
+        """Write the reassembled payload and token usage onto the response.
+
+        A stream cut short before its ``done`` chunk leaves both unset; the text already
+        emitted is unaffected.
+        """
+        if self._final_chunk is None:
+            return
+        payload = self._final_chunk.model_dump()
+        payload["message"]["content"] = "".join(self._content)
+        payload["message"]["thinking"] = "".join(self._thinking) or None
+        payload["message"]["tool_calls"] = self._tool_calls or None
+        self.response.response_json = payload
+        self.response.set_usage(
+            input=self._final_chunk.prompt_eval_count,
+            output=self._final_chunk.eval_count,
+        )
 
 
 def _pick_primary_name(names: list[str]) -> tuple[str, tuple[str, ...]]:
