@@ -448,6 +448,61 @@ def test_hide_reasoning_suppresses_reasoning_events(mocker, mock_ollama_client):
     assert kwargs.get("think") is True
 
 
+def test_streamed_response_json_matches_non_streamed(mocker, mock_ollama_client):
+    """Streaming reassembles the payload Ollama would have returned unstreamed."""
+    _install_sync_chat(
+        mock_ollama_client,
+        chunks=[
+            _ollama_chunk(thinking="Let me "),
+            _ollama_chunk(thinking="think..."),
+            _ollama_chunk(tool_calls=[("multiply", {"a": 6, "b": 7})]),
+            _ollama_chunk("Answer: "),
+            _ollama_chunk("42", done=True, usage=True),
+        ],
+    )
+    streamed = get_model("deepseek-r1:70b").prompt("Dummy Prompt")
+    streamed.text()
+
+    _install_sync_chat(
+        mock_ollama_client,
+        response=_ollama_chunk(
+            "Answer: 42",
+            thinking="Let me think...",
+            tool_calls=[("multiply", {"a": 6, "b": 7})],
+            done=True,
+            usage=True,
+        ),
+    )
+    non_streamed = get_model("deepseek-r1:70b").prompt("Dummy Prompt", stream=False)
+    non_streamed.text()
+
+    assert streamed.response_json == non_streamed.response_json
+    message = streamed.response_json["message"]
+    assert message["content"] == "Answer: 42"
+    assert message["thinking"] == "Let me think..."
+    assert message["tool_calls"][0]["function"]["name"] == "multiply"
+    # Envelope comes from the final chunk — the only one carrying usage counts.
+    assert streamed.response_json["prompt_eval_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_async_streaming_reassembles_response_json(mocker, mock_ollama_client):
+    """The async pump drives the same accumulator down a separate code path."""
+    _install_async_chat(
+        mocker,
+        chunks=[
+            _ollama_chunk("Test response 1"),
+            _ollama_chunk("Test response 2", done=True, usage=True),
+        ],
+    )
+
+    response = get_async_model("llama2:7b").prompt("Dummy Prompt")
+    await response.text()
+
+    message = response.response_json["message"]
+    assert message["content"] == "Test response 1Test response 2"
+
+
 def test_tool_call_reply_round_trip(mocker, mock_ollama_client):
     """response.reply() round-trips a tool call + result back into the next request."""
     from llm import ToolResult
