@@ -532,9 +532,10 @@ def _llm_tool_to_ollama_tool(tool: llm.Tool) -> ollama.Tool:
     """Convert an llm.Tool to an ollama.Tool.
 
     Uses ollama's convert_function_to_tool for the initial conversion, then
-    overrides the parameters with tool.input_schema when it contains properties.
-    This handles tools whose implementation is **kwargs-bound and carries the
-    real parameter schema in input_schema rather than the function signature.
+    overrides the parameters with tool.input_schema when it is a dict, even if
+    it has no properties. This handles tools whose implementation is
+    **kwargs-bound and carries the real parameter schema in input_schema rather
+    than the function signature.
 
     Parameters
     ----------
@@ -553,7 +554,7 @@ def _llm_tool_to_ollama_tool(tool: llm.Tool) -> ollama.Tool:
     ollama_tool.function.name = tool.name
     if tool.description:
         ollama_tool.function.description = tool.description
-    if tool.input_schema.get("properties"):
+    if isinstance(tool.input_schema, dict):
         ollama_tool.function.parameters = ollama.Tool.Function.Parameters(
             type=tool.input_schema.get("type"),
             required=tool.input_schema.get("required"),
@@ -565,7 +566,7 @@ def _llm_tool_to_ollama_tool(tool: llm.Tool) -> ollama.Tool:
                         if f in ("type", "description", "enum", "items")
                     },
                 )
-                for k, p in tool.input_schema["properties"].items()
+                for k, p in tool.input_schema.get("properties", {}).items()
             },
         )
     return ollama_tool
