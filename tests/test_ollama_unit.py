@@ -445,6 +445,20 @@ def test_tool_conversion_kwargs_uses_input_schema():
     assert params.required == ["database", "sql"]
 
 
+def test_tool_conversion_kwargs_empty_schema():
+    tool = llm.Tool(
+        name="t",
+        input_schema={"type": "object", "properties": {}},
+        implementation=lambda **kwargs: "x",
+    )
+    ollama_tool = _llm_tool_to_ollama_tool(tool)
+
+    assert ollama_tool.function.name == "t"
+    params = ollama_tool.function.parameters
+    assert dict(params.properties or {}) == {}
+    assert not params.required
+
+
 def test_tool_conversion_name_and_description_override():
     tool = _make_kwargs_tool(name="custom_name", description="Custom description")
     ollama_tool = _llm_tool_to_ollama_tool(tool)
