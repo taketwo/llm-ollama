@@ -19,12 +19,13 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: pyproject.toml
+      - name: Set up just
+        uses: extractions/setup-just@v4
       - name: Install dependencies
         run: |
-          pip install -e '.[lint,test]'
-      - name: Check code formatting
-        run: |
-          python -m ruff format --check --diff .
+          python -m venv .venv
+          .venv/bin/pip install -e '.[lint,test]'
+      - name: Run checks
+        run: just check
       - name: Run tests
-        run: |
-          python -m pytest
+        run: just test
