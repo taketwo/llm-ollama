@@ -20,6 +20,7 @@ from pydantic import Field, TypeAdapter, ValidationError
 
 from llm_ollama.auth import get_async_client, get_client, resolve_key
 from llm_ollama.cache import Cache
+from llm_ollama.tools import register_tools as register_tools
 
 cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
 
@@ -48,24 +49,6 @@ def register_commands(cli):
         to_print.sort(key=lambda x: x["model"])
         done = dicts_to_table_string(["model", "digest", "capabilities"], to_print)
         print("\n".join(done))
-
-
-@llm.hookimpl
-def register_tools(register):
-    register(
-        llm.Tool(
-            name="ollama_web_search",
-            description="Search the web for information",
-            implementation=ollama.web_search,
-        ),
-    )
-    register(
-        llm.Tool(
-            name="ollama_web_fetch",
-            description="Fetch the contents of a web page",
-            implementation=ollama.web_fetch,
-        ),
-    )
 
 
 @llm.hookimpl
