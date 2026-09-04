@@ -161,7 +161,7 @@ Additionally, the -o flag supports plugin-specific options:
 
 ## Connecting to Ollama server
 
-The plugin connects to an Ollama server to list and run models. Three deployment scenarios are supported: a local server, a self-hosted remote server, and Ollama's hosted cloud service.
+The plugin connects to an Ollama server to list and run models. Four deployment scenarios are supported: a local server, a self-hosted remote server, Ollama's hosted cloud service, and an Ollama-compatible server such as llmman.
 
 ### Local server
 
@@ -225,6 +225,19 @@ A key can also be supplied per call with `--key`, which overrides both of the ab
 
 ```bash
 llm -m gpt-oss:120b-cloud --key your-api-key "How much is 2+2?"
+```
+
+### llmman
+
+[llmman](https://github.com/llmmanorg/llmman) is a local model runner that serves the Ollama API (alongside OpenAI- and Anthropic-compatible ones) on port `17434`. Models are pulled as OCI artifacts or straight from Hugging Face and served by `llama.cpp`, `vllm`, or `mlx-lm`. No API key is required.
+
+To use it, start the server, pull a model, and point the plugin at it:
+
+```bash
+llmman serve
+llmman pull gemma4
+export OLLAMA_HOST=http://localhost:17434
+llm -m gemma4 "How much is 2+2?"
 ```
 
 ## Development
