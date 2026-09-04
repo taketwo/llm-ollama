@@ -11,3 +11,6 @@ __pycache__/
 
 # Environments
 venv/
+
+# This is a library with a wide supported-version range, not a deployed app
+uv.lock
