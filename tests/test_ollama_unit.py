@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, Mock
 import llm
 import ollama
 import pytest
+from helpers import assert_bearer_token
 from httpx import ConnectError
 from llm import (
     get_async_model,
@@ -135,11 +136,6 @@ def _assert_tool_call(tc, name, arguments):
     assert tc.arguments == arguments
 
 
-def _assert_bearer_token(client_class, token):
-    _, kwargs = client_class.call_args
-    assert kwargs["headers"]["Authorization"] == f"Bearer {token}"
-
-
 def test_plugin_is_installed():
     load_plugins()
     names = [mod.__name__ for mod in pm.get_plugins()]
@@ -241,7 +237,7 @@ def test_chat_key_reaches_client_as_bearer_token(mocker, bare_env):
 
     Ollama("llama2:7b").prompt("Dummy Prompt", key="caller-key").text()
 
-    _assert_bearer_token(client_class, "caller-key")
+    assert_bearer_token(client_class, "caller-key")
 
 
 @pytest.mark.asyncio
@@ -257,7 +253,7 @@ async def test_async_chat_key_reaches_client_as_bearer_token(mocker, bare_env):
 
     await AsyncOllama("llama2:7b").prompt("Dummy Prompt", key="caller-key").text()
 
-    _assert_bearer_token(client_class, "caller-key")
+    assert_bearer_token(client_class, "caller-key")
 
 
 def test_embed_key_reaches_client_as_bearer_token(mocker, bare_env):
@@ -268,7 +264,7 @@ def test_embed_key_reaches_client_as_bearer_token(mocker, bare_env):
 
     OllamaEmbed("mxbai-embed-large:latest").embed("string to embed", key="caller-key")
 
-    _assert_bearer_token(client_class, "caller-key")
+    assert_bearer_token(client_class, "caller-key")
 
 
 def test_registered_models_when_ollama_is_down(mocker):
