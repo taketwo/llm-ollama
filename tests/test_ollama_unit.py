@@ -142,6 +142,21 @@ def test_plugin_is_installed():
     assert "llm_ollama" in names
 
 
+def test_tool_conversion_no_input_schema_uses_signature():
+    """A tool with a real signature and no input_schema keeps its signature-derived parameters."""
+
+    def search(query: str, max_results: int = 3) -> str:
+        """Search."""
+        return "x"
+
+    tool = llm.Tool(name="search", description="Search", implementation=search)
+    ollama_tool = _llm_tool_to_ollama_tool(tool)
+
+    params = ollama_tool.function.parameters
+    assert set(params.properties.keys()) == {"query", "max_results"}
+    assert params.required == ["query", "max_results"]
+
+
 def test_registered_chat_models(mock_ollama_client):
     expected = (
         ("deepseek-r1:70b-llama-distill-q4_K_M", ["deepseek-r1:70b"]),

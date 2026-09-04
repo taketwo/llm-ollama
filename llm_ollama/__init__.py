@@ -514,21 +514,14 @@ def _get_ollama_model_capabilities(digest: str, model: str) -> list[str]:
 def _llm_tool_to_ollama_tool(tool: llm.Tool) -> ollama.Tool:
     """Convert an llm.Tool to an ollama.Tool.
 
-    Uses ollama's convert_function_to_tool for the initial conversion, then
-    overrides the parameters with tool.input_schema when it is a dict, even if
-    it has no properties. This handles tools whose implementation is
-    **kwargs-bound and carries the real parameter schema in input_schema rather
-    than the function signature.
+    tool.input_schema, when set, overrides the parameters that would otherwise be
+    derived from tool.implementation's signature — this is how tools whose
+    implementation is **kwargs-bound carry their real parameter schema.
 
     Parameters
     ----------
     tool : llm.Tool
         An llm.Tool instance with a callable implementation.
-
-    Returns
-    -------
-    ollama.Tool
-        An ollama.Tool instance.
 
     """
     assert tool.implementation is not None
@@ -537,7 +530,7 @@ def _llm_tool_to_ollama_tool(tool: llm.Tool) -> ollama.Tool:
     ollama_tool.function.name = tool.name
     if tool.description:
         ollama_tool.function.description = tool.description
-    if isinstance(tool.input_schema, dict):
+    if tool.input_schema:
         ollama_tool.function.parameters = ollama.Tool.Function.Parameters(
             type=tool.input_schema.get("type"),
             required=tool.input_schema.get("required"),
