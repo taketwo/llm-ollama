@@ -13,8 +13,8 @@ from llm import (
 )
 from llm.plugins import load_plugins, pm
 
-from llm_ollama import OllamaEmbed
 from llm_ollama.models.chat import AsyncOllama, Ollama, _llm_tool_to_ollama_tool
+from llm_ollama.models.embed import OllamaEmbed
 
 
 @pytest.fixture

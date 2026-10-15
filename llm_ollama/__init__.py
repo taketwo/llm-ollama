@@ -1,14 +1,12 @@
-import os
-import warnings
 from collections import defaultdict
 
 import llm
 from llm.utils import dicts_to_table_string
-from pydantic import TypeAdapter, ValidationError
 
-from llm_ollama.auth import get_client, resolve_key
+from llm_ollama.auth import get_client
 from llm_ollama.cache import Cache
 from llm_ollama.models.chat import AsyncOllama, Ollama
+from llm_ollama.models.embed import OllamaEmbed
 from llm_ollama.tools import register_tools as register_tools
 
 cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
@@ -71,41 +69,6 @@ def register_embedding_models(register):
     for names in models.values():
         name, aliases = _pick_primary_name(names)
         register(OllamaEmbed(name), aliases=aliases)
-
-
-class OllamaEmbed(llm.EmbeddingModel):
-    supports_text = True
-    supports_binary = False
-    batch_size = 8
-
-    def __init__(self, model_id):
-        self.model_id = model_id
-        self.truncate = True
-
-        # Read OLLAMA_EMBED_TRUNCATE environment variable to decide if truncation
-        # is enabled. If truncation is disabled and the input is too long, ollama.embed
-        # call will fail.
-        if (truncate := os.getenv("OLLAMA_EMBED_TRUNCATE")) is not None:
-            try:
-                self.truncate = TypeAdapter(bool).validate_python(truncate)
-            except ValidationError:
-                warnings.warn(
-                    f"OLLAMA_EMBED_TRUNCATE is set to '{truncate}', which is not a valid boolean value; defaulting to True",
-                )
-
-    def __str__(self) -> str:
-        return f"Ollama: {self.model_id}"
-
-    def get_key(self, explicit_key: str | None = None) -> str | None:
-        return resolve_key(explicit_key)
-
-    def embed_batch(self, items, *, key: str | None = None):
-        result = get_client(key=key).embed(
-            model=self.model_id,
-            input=items,
-            truncate=self.truncate,
-        )
-        yield from result["embeddings"]
 
 
 def _pick_primary_name(names: list[str]) -> tuple[str, tuple[str, ...]]:
