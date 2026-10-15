@@ -10,7 +10,7 @@ from llm_ollama.auth import get_client
 from llm_ollama.models.base import BaseMixin
 
 
-class OllamaEmbed(BaseMixin, llm.EmbeddingModel):
+class OllamaEmbeddingModel(BaseMixin, llm.EmbeddingModel):
     supports_text = True
     supports_binary = False
     batch_size = 8

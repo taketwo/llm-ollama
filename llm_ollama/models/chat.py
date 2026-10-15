@@ -21,7 +21,7 @@ from llm_ollama.auth import get_async_client, get_client
 from llm_ollama.models.base import BaseMixin
 
 
-class _SharedOllama(BaseMixin):
+class ChatMixin(BaseMixin):
     can_stream: bool = True
     supports_schema: bool = True
     supports_tools: bool = True
@@ -176,7 +176,7 @@ class _SharedOllama(BaseMixin):
         return options, kwargs
 
 
-class Ollama(_SharedOllama, llm.KeyModel):
+class OllamaChatModel(ChatMixin, llm.KeyModel):
     def execute(
         self,
         prompt: llm.Prompt,
@@ -210,7 +210,7 @@ class Ollama(_SharedOllama, llm.KeyModel):
         accumulator.finalize()
 
 
-class AsyncOllama(_SharedOllama, llm.AsyncKeyModel):
+class AsyncOllamaChatModel(ChatMixin, llm.AsyncKeyModel):
     async def execute(
         self,
         prompt: llm.Prompt,
