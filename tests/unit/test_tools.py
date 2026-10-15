@@ -24,7 +24,6 @@ def test_registered_tools():
 )
 def test_web_tool_uses_key_from_llm_store(
     mocker,
-    bare_env,
     wrapper,
     method_name,
     call_args,

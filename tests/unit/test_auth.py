@@ -9,9 +9,6 @@ import pytest
 from llm_ollama.auth import _parse_auth_from_url, get_async_client, get_client
 
 
-pytestmark = pytest.mark.usefixtures("bare_env")
-
-
 @pytest.fixture(autouse=True)
 def mock_get_key():
     """Suppress the real key lookup, which would otherwise read the developer's keys."""
@@ -26,13 +23,13 @@ def mock_basic_auth():
 
 
 @pytest.fixture
-def mock_ollama_client():
+def mock_client_class():
     with patch("llm_ollama.auth.ollama.Client") as mock:
         yield mock
 
 
 @pytest.fixture
-def mock_ollama_async_client():
+def mock_async_client_class():
     with patch("llm_ollama.auth.ollama.AsyncClient") as mock:
         yield mock
 
@@ -46,8 +43,8 @@ class _ClientUnderTest(NamedTuple):
 
 @pytest.fixture(
     params=[
-        (get_client, "mock_ollama_client"),
-        (get_async_client, "mock_ollama_async_client"),
+        (get_client, "mock_client_class"),
+        (get_async_client, "mock_async_client_class"),
     ],
     ids=["sync", "async"],
 )
@@ -170,7 +167,7 @@ def test_various_basic_auth_formats(
     expected_user,
     expected_pass,
     mock_basic_auth,
-    mock_ollama_client,
+    mock_client_class,
     monkeypatch,
 ):
     """Test parsing various URL formats with basic authentication."""
@@ -182,7 +179,7 @@ def test_various_basic_auth_formats(
         username=expected_user,
         password=expected_pass,
     )
-    mock_ollama_client.assert_called_once_with(
+    mock_client_class.assert_called_once_with(
         host=expected_host,
         auth=mock_auth_instance,
         headers={},
@@ -275,7 +272,7 @@ def test_parse_ipv6_url_preserves_components_and_decodes_basic_auth():
 def test_various_ollama_headers_formats(
     headers_env,
     expected_headers,
-    mock_ollama_client,
+    mock_client_class,
     monkeypatch,
 ):
     """Test parsing various OLLAMA_HEADERS formats."""
@@ -285,7 +282,7 @@ def test_various_ollama_headers_formats(
             get_client()
     else:
         get_client()
-        mock_ollama_client.assert_called_once_with(
+        mock_client_class.assert_called_once_with(
             timeout=ANY,
             headers=expected_headers,
         )

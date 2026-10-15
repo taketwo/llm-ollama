@@ -21,68 +21,6 @@ from llm_ollama.models.chat import (
 from llm_ollama.models.embed import OllamaEmbeddingModel
 
 
-@pytest.fixture
-def mock_ollama_client(mocker):
-    return_value = {
-        "models": [
-            {
-                "model": "stable-code:3b",
-                "digest": "aa5ab8afb86208e1c097028d63074f0142ce6079420ea6f68f219933361fd869",
-                "model_info": {},
-                "capabilities": ["completion"],
-            },
-            {
-                "model": "llama2:7b",
-                "digest": "78e26419b4469263f75331927a00a0284ef6544c1975b826b15abdaef17bb962",
-                "model_info": {},
-                "capabilities": ["completion"],
-            },
-            {
-                "model": "llama2:7b-q4_K_M",
-                "digest": "78e26419b4469263f75331927a00a0284ef6544c1975b826b15abdaef17bb962",
-                "model_info": {},
-                "capabilities": ["completion"],
-            },
-            {
-                "model": "llama2:latest",
-                "digest": "78e26419b4469263f75331927a00a0284ef6544c1975b826b15abdaef17bb962",
-                "model_info": {},
-                "capabilities": ["completion"],
-            },
-            {
-                "model": "phi3:latest",
-                "digest": "e2fd6321a5fe6bb3ac8a4e6f1cf04477fd2dea2924cf53237a995387e152ee9c",
-                "model_info": {},
-                "capabilities": ["completion"],
-            },
-            {
-                "model": "mxbai-embed-large:latest",
-                "digest": "468836162de7f81e041c43663fedbbba921dcea9b9fefea135685a39b2d83dd8",
-                "model_info": {},
-                "capabilities": ["embedding"],
-            },
-            {
-                "model": "deepseek-r1:70b",
-                "digest": "0c1615a8ca32ef41e433aa420558b4685f9fc7f3fd74119860a8e2e389cd7942",
-                "model_info": {},
-                "capabilities": ["completion", "thinking"],
-            },
-            {
-                "model": "deepseek-r1:70b-llama-distill-q4_K_M",
-                "digest": "0c1615a8ca32ef41e433aa420558b4685f9fc7f3fd74119860a8e2e389cd7942",
-                "model_info": {},
-                "capabilities": ["completion", "thinking"],
-            },
-        ],
-    }
-    client = mocker.patch("ollama.Client").return_value
-    client.list.return_value = return_value
-    client.show.side_effect = lambda name: next(
-        ollama.ShowResponse(**m) for m in return_value["models"] if m["model"] == name
-    )
-    return client
-
-
 def _ollama_chunk(
     content="",
     *,
@@ -249,7 +187,7 @@ def test_get_key_returns_none_when_no_key_is_configured(mocker):
     assert OllamaEmbeddingModel("mxbai-embed-large:latest").get_key() is None
 
 
-def test_chat_key_reaches_client_as_bearer_token(mocker, bare_env):
+def test_chat_key_reaches_client_as_bearer_token(mocker):
     """A per-call key travels from prompt() through to the client's auth header."""
     client = Mock()
     client.chat.return_value = iter([_ollama_chunk("ok", done=True, usage=True)])
@@ -261,7 +199,7 @@ def test_chat_key_reaches_client_as_bearer_token(mocker, bare_env):
 
 
 @pytest.mark.asyncio
-async def test_async_chat_key_reaches_client_as_bearer_token(mocker, bare_env):
+async def test_async_chat_key_reaches_client_as_bearer_token(mocker):
     """The async client is built from the resolved key just as the sync one is."""
 
     async def mock_chat(*_args, **_kwargs):
@@ -280,7 +218,7 @@ async def test_async_chat_key_reaches_client_as_bearer_token(mocker, bare_env):
     assert_bearer_token(client_class, "caller-key")
 
 
-def test_embed_key_reaches_client_as_bearer_token(mocker, bare_env):
+def test_embed_key_reaches_client_as_bearer_token(mocker):
     """A per-call key travels from embed() through to the client's auth header."""
     client = Mock()
     client.embed.return_value = {"embeddings": [[0.1]]}
