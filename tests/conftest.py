@@ -147,6 +147,12 @@ def vision_model(vision_config: dict) -> str:
 
 
 @pytest.fixture
+def box_png() -> bytes:
+    """A PNG image of the word "shark" in black on white."""
+    return (Path(__file__).parent / "data" / "box.png").read_bytes()
+
+
+@pytest.fixture
 def bare_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Clear the variables client creation reads, so a test sets only what it is about.
 
