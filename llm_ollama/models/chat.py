@@ -17,10 +17,11 @@ from llm.utils import monotonic_ulid
 from ollama._utils import convert_function_to_tool
 from pydantic import Field
 
-from llm_ollama.auth import get_async_client, get_client, resolve_key
+from llm_ollama.auth import get_async_client, get_client
+from llm_ollama.models.base import BaseMixin
 
 
-class _SharedOllama:
+class _SharedOllama(BaseMixin):
     can_stream: bool = True
     supports_schema: bool = True
     supports_tools: bool = True
@@ -93,12 +94,6 @@ class _SharedOllama:
     ) -> None:
         self.model_id = model_id
         self.supports_tools = supports_tools
-
-    def __str__(self) -> str:
-        return f"Ollama: {self.model_id}"
-
-    def get_key(self, explicit_key: str | None = None) -> str | None:
-        return resolve_key(explicit_key)
 
     def build_messages(self, prompt, conversation):
         # `conversation` is unused: under the llm 0.32 contract the framework

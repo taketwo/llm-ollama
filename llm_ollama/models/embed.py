@@ -6,10 +6,11 @@ import warnings
 import llm
 from pydantic import TypeAdapter, ValidationError
 
-from llm_ollama.auth import get_client, resolve_key
+from llm_ollama.auth import get_client
+from llm_ollama.models.base import BaseMixin
 
 
-class OllamaEmbed(llm.EmbeddingModel):
+class OllamaEmbed(BaseMixin, llm.EmbeddingModel):
     supports_text = True
     supports_binary = False
     batch_size = 8
@@ -28,12 +29,6 @@ class OllamaEmbed(llm.EmbeddingModel):
                 warnings.warn(
                     f"OLLAMA_EMBED_TRUNCATE is set to '{truncate}', which is not a valid boolean value; defaulting to True",
                 )
-
-    def __str__(self) -> str:
-        return f"Ollama: {self.model_id}"
-
-    def get_key(self, explicit_key: str | None = None) -> str | None:
-        return resolve_key(explicit_key)
 
     def embed_batch(self, items, *, key: str | None = None):
         result = get_client(key=key).embed(
