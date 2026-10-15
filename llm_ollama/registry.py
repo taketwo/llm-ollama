@@ -6,8 +6,8 @@ import llm
 
 from llm_ollama.auth import get_client
 from llm_ollama.cache import Cache
-from llm_ollama.models.chat import AsyncOllama, Ollama
-from llm_ollama.models.embed import OllamaEmbed
+from llm_ollama.models.chat import AsyncOllamaChatModel, OllamaChatModel
+from llm_ollama.models.embed import OllamaEmbeddingModel
 
 cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
 
@@ -27,8 +27,8 @@ def register_models(register, model_aliases=None):
             continue
         supports_tools = "tools" in capabilities
         register(
-            Ollama(name, supports_tools=supports_tools),
-            AsyncOllama(name, supports_tools=supports_tools),
+            OllamaChatModel(name, supports_tools=supports_tools),
+            AsyncOllamaChatModel(name, supports_tools=supports_tools),
             aliases=aliases,
         )
 
@@ -42,7 +42,7 @@ def register_embedding_models(register):
             models[model["digest"]].append(model["model"][: -len(":latest")])
     for names in models.values():
         name, aliases = _pick_primary_name(names)
-        register(OllamaEmbed(name), aliases=aliases)
+        register(OllamaEmbeddingModel(name), aliases=aliases)
 
 
 def _pick_primary_name(names: list[str]) -> tuple[str, tuple[str, ...]]:
