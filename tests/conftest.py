@@ -1,149 +1,121 @@
+from dataclasses import dataclass
 from pathlib import Path
 
+import ollama
 import pytest
 
 
+@dataclass(frozen=True)
+class ModelKind:
+    """A kind of model that integration tests need from the Ollama server.
+
+    Each kind gets a marker of the same name, ``--<name>`` and ``--no-<name>`` flags
+    that force its tests on or off, and a ``--<name>-model`` option that picks the model.
+    """
+
+    name: str
+    default_model: str
+    capabilities: tuple[str, ...]  # what the model must support, in Ollama's terms
+
+
+MODEL_KINDS = (
+    ModelKind("chat", "qwen3:8b", ("completion", "tools", "thinking")),
+    ModelKind("vision", "gemma3:latest", ("completion", "vision")),
+)
+
+ENABLED_KINDS = pytest.StashKey[set[str]]()
+
+
 def pytest_addoption(parser: pytest.Parser) -> None:
-    """Add command-line options for integration test control."""
-    group = parser.getgroup("integration")
-    group.addoption(
-        "--integration",
-        action="store_true",
-        help="force enable integration tests",
-    )
-    group.addoption(
-        "--no-integration",
-        action="store_true",
-        help="force disable integration tests",
-    )
-    group.addoption(
-        "--model",
-        action="store",
-        default="qwen3:8b",
-        help="specify a model to use for integration tests (has to be capable of completion and tool usage)",
-    )
-    # Separate options for vision tests, since the models capable of tools and vision are large.
-    group.addoption(
-        "--vision",
-        action="store_true",
-        help="force enable vision tests",
-    )
-    group.addoption(
-        "--no-vision",
-        action="store_true",
-        help="force disable vision tests",
-    )
-    group.addoption(
-        "--vision-model",
-        action="store",
-        default="gemma3:latest",
-        help="specify a vision model to use for integration tests (has to be capable of vision)",
-    )
+    group = parser.getgroup("integration", "integration tests against an Ollama server")
+    for kind in MODEL_KINDS:
+        group.addoption(
+            f"--{kind.name}",
+            action="store_true",
+            help=f"force enable {kind.name} tests",
+        )
+        group.addoption(
+            f"--no-{kind.name}",
+            action="store_true",
+            help=f"force disable {kind.name} tests",
+        )
+        group.addoption(
+            f"--{kind.name}-model",
+            default=kind.default_model,
+            help=f"model for {kind.name} tests, which must support "
+            f"{', '.join(kind.capabilities)} (default: %(default)s)",
+        )
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Configure integration testing setup.
-
-    Performs two tasks:
-    1. Registers the 'integration' marker to avoid pytest warnings about unknown markers
-    2. Validates CLI options, ensuring --integration and --no-integration are not used
-       together
-    """
-    config.addinivalue_line(
-        "markers",
-        "integration: mark test as requiring Ollama server",
-    )
-    config.addinivalue_line(
-        "markers",
-        "vision: mark test as requiring Ollama server with vision model",
-    )
-
-    if config.getoption("--integration") and config.getoption("--no-integration"):
-        raise pytest.UsageError(
-            "--integration and --no-integration are mutually exclusive",
+    """Register a marker for each model kind and reject contradictory flags."""
+    for kind in MODEL_KINDS:
+        config.addinivalue_line(
+            "markers",
+            f"{kind.name}: needs a {kind.name} model on the Ollama server",
         )
-    if config.getoption("--vision") and config.getoption("--no-vision"):
-        raise pytest.UsageError(
-            "--vision and --no-vision are mutually exclusive",
-        )
+        if config.getoption(f"--{kind.name}") and config.getoption(f"--no-{kind.name}"):
+            raise pytest.UsageError(
+                f"--{kind.name} and --no-{kind.name} are mutually exclusive",
+            )
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:
-    """Determine if integration tests should run.
+    """Decide which model kinds to test.
 
-    The decision is based on command-line options and availability of Ollama server
-    and necessary model(s).
+    A kind is enabled when the Ollama server has its model, unless ``--no-<kind>`` is
+    given. With ``--<kind>``, the run stops if the server cannot be queried or lacks the
+    model.
     """
-
-    def is_enabled(model_option: str, force_on: str, force_off: str):
-        model = session.config.getoption(model_option)
-        enabled = False
-        if not session.config.getoption(force_off):
-            try:
-                models = __import__("ollama").list()["models"]
-                if any(model in m.model for m in models):
-                    enabled = True
-                elif session.config.getoption(force_on):
-                    pytest.exit(
-                        f"Integration tests forced but model {model} is not available",
-                        1,
-                    )
-            except Exception as e:
-                if session.config.getoption(force_on):
-                    pytest.exit(
-                        f"Integration tests forced but Ollama discovery failed: {e}",
-                        1,
-                    )
-        return {
-            "enabled": enabled,
-            "model": model,
-        }
-
-    session.config._integration = is_enabled(
-        "--model", "--integration", "--no-integration"
-    )
-    session.config._vision = is_enabled("--vision-model", "--vision", "--no-vision")
+    config = session.config
+    enabled = set()
+    for kind in MODEL_KINDS:
+        if config.getoption(f"--no-{kind.name}"):
+            continue
+        forced = config.getoption(f"--{kind.name}")
+        model = config.getoption(f"--{kind.name}-model")
+        try:
+            server_models = ollama.list()["models"]
+        except Exception as error:
+            if forced:
+                pytest.exit(
+                    f"--{kind.name} given but Ollama discovery failed: {error}", 1
+                )
+            continue
+        if any(model in server_model.model for server_model in server_models):
+            enabled.add(kind.name)
+        elif forced:
+            pytest.exit(f"--{kind.name} given but model {model} is not available", 1)
+    config.stash[ENABLED_KINDS] = enabled
 
 
 def pytest_collection_modifyitems(
     config: pytest.Config,
     items: list[pytest.Item],
 ) -> None:
-    """Skip integration tests if integration is disabled."""
-    if not config._integration["enabled"]:
-        skip_integration = pytest.mark.skip(reason="Integration tests disabled")
+    """Skip the tests of each model kind that is not enabled."""
+    enabled = config.stash[ENABLED_KINDS]
+    for kind in MODEL_KINDS:
+        if kind.name in enabled:
+            continue
+        skip = pytest.mark.skip(reason=f"{kind.name} tests disabled")
         for item in items:
-            if "integration" in item.keywords:
-                item.add_marker(skip_integration)
-    if not config._vision["enabled"]:
-        skip_vision = pytest.mark.skip(reason="Vision tests disabled")
-        for item in items:
-            if "vision" in item.keywords:
-                item.add_marker(skip_vision)
+            if item.get_closest_marker(kind.name):
+                item.add_marker(skip)
 
 
-@pytest.fixture(scope="session")
-def integration_config(pytestconfig: pytest.Config) -> dict:
-    """Get integration test configuration."""
-    return pytestconfig._integration
+@pytest.fixture
+def model_name(request: pytest.FixtureRequest) -> str:
+    """The model to test, given by the ``--<kind>-model`` option of the test's kind.
 
-
-@pytest.fixture(scope="session")
-def integration_model(integration_config: dict) -> str:
-    """Get name of a model to use for integration tests."""
-    return integration_config["model"]
-
-
-@pytest.fixture(scope="session")
-def vision_config(pytestconfig: pytest.Config) -> dict:
-    """Get vision test configuration."""
-    return pytestconfig._vision
-
-
-@pytest.fixture(scope="session")
-def vision_model(vision_config: dict) -> str:
-    """Get name of a model to use for vision tests."""
-    return vision_config["model"]
+    The test must carry exactly one model kind marker.
+    """
+    (kind,) = [
+        candidate
+        for candidate in MODEL_KINDS
+        if request.node.get_closest_marker(candidate.name)
+    ]
+    return request.config.getoption(f"--{kind.name}-model")
 
 
 @pytest.fixture
