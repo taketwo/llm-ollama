@@ -26,3 +26,7 @@ dev = ["typing-extensions>=4.15.0"]
 
 [tool.setuptools.packages.find]
 include = ["llm_ollama*"]
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+pythonpath = ["tests"]
