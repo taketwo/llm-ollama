@@ -1,22 +1,19 @@
 import json
-import re
 
 import pytest
 from llm import Attachment, get_model, schema_dsl
 
 
 @pytest.mark.vision
-def test_attachments(vision_model):
+def test_attachments(vision_model, box_png):
     """Test attachment handling in conversations."""
     model = get_model(vision_model)
 
-    # Get the image into history without cheating.
-    box = open("tests/data/box.png", "rb").read()
     response = model.prompt(
         "What is written in the image?",
         system="""Role: Test assistant for conversation history.
 Task: Warn about missing images/history. Keep replies short. Images are english text.""",
-        attachments=[Attachment(content=box, type="image/png")],
+        attachments=[Attachment(content=box_png, type="image/png")],
         schema=schema_dsl("text"),
     )
     response_text = response.text()
@@ -26,21 +23,20 @@ Task: Warn about missing images/history. Keep replies short. Images are english 
 
 
 @pytest.mark.vision
-def test_conversation_attachments(vision_model):
+def test_conversation_attachments(vision_model, box_png):
     """Test attachment handling in conversations."""
     model = get_model(vision_model)
 
     convo = model.conversation()
 
     # Get the image into history without cheating.
-    box = open("tests/data/box.png", "rb").read()
     assert (
         "shark"
         not in convo.prompt(
             "Is image available, yes or no?",
             system="""Role: Test assistant for conversation history.
 Task: Warn about missing images/history. Keep replies short. Images are one basic color.""",
-            attachments=[Attachment(content=box, type="image/png")],
+            attachments=[Attachment(content=box_png, type="image/png")],
         )
         .text()
         .lower()

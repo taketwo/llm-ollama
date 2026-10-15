@@ -633,15 +633,12 @@ def test_tool_call_reply_round_trip(mocker, mock_ollama_client):
     assert tool_msg == {"role": "tool", "content": "42", "name": "multiply"}
 
 
-def test_build_messages_handles_multi_attachment_history(mock_ollama_client):
+def test_build_messages_handles_multi_attachment_history(mock_ollama_client, box_png):
     """A conversation with attachments across turns survives the new Part chain."""
-    from pathlib import Path
-
     from llm import Attachment
 
-    png_bytes = (Path(__file__).parent / "data" / "box.png").read_bytes()
-    att_a = Attachment(content=png_bytes, type="image/png")
-    att_b = Attachment(content=png_bytes + b"\x00", type="image/png")
+    att_a = Attachment(content=box_png, type="image/png")
+    att_b = Attachment(content=box_png + b"\x00", type="image/png")
 
     model = get_model("llama2:7b")
     conversation = model.conversation()
