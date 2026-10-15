@@ -4,21 +4,13 @@ import llm
 import ollama
 import pytest
 from helpers import assert_bearer_token
-from httpx import ConnectError
-from llm import (
-    get_async_model,
-    get_embedding_models_with_aliases,
-    get_model,
-    get_models_with_aliases,
-)
-from llm.plugins import load_plugins, pm
+from llm import get_async_model, get_model
 
 from llm_ollama.models.chat import (
     AsyncOllamaChatModel,
     OllamaChatModel,
     _llm_tool_to_ollama_tool,
 )
-from llm_ollama.models.embed import OllamaEmbeddingModel
 
 
 def _ollama_chunk(
@@ -79,12 +71,6 @@ def _assert_tool_call(tc, name, arguments):
     assert tc.arguments == arguments
 
 
-def test_plugin_is_installed():
-    load_plugins()
-    names = [mod.__name__ for mod in pm.get_plugins()]
-    assert "llm_ollama" in names
-
-
 def test_tool_conversion_no_input_schema_uses_signature():
     """A tool with a real signature and no input_schema keeps its signature-derived parameters."""
 
@@ -98,93 +84,6 @@ def test_tool_conversion_no_input_schema_uses_signature():
     params = ollama_tool.function.parameters
     assert set(params.properties.keys()) == {"query", "max_results"}
     assert params.required == ["query", "max_results"]
-
-
-def test_registered_chat_models(mock_ollama_client):
-    expected = (
-        ("deepseek-r1:70b-llama-distill-q4_K_M", ["deepseek-r1:70b"]),
-        ("llama2:7b-q4_K_M", ["llama2:7b", "llama2:latest", "llama2"]),
-        ("phi3:latest", ["phi3"]),
-        ("stable-code:3b", []),
-    )
-    registered_ollama_models = sorted(
-        [m for m in get_models_with_aliases() if isinstance(m.model, OllamaChatModel)],
-        key=lambda m: m.model.model_id,
-    )
-    assert len(registered_ollama_models) == len(expected)
-    for model, (name, aliases) in zip(registered_ollama_models, expected):
-        assert model.model.model_id == name
-        assert model.aliases == aliases
-
-
-def test_registered_embedding_models(mock_ollama_client):
-    expected = (
-        ("deepseek-r1:70b-llama-distill-q4_K_M", ["deepseek-r1:70b"]),
-        ("llama2:7b-q4_K_M", ["llama2:7b", "llama2:latest", "llama2"]),
-        ("mxbai-embed-large:latest", ["mxbai-embed-large"]),
-        ("phi3:latest", ["phi3"]),
-        ("stable-code:3b", []),
-    )
-    registered_ollama_models = sorted(
-        [
-            m
-            for m in get_embedding_models_with_aliases()
-            if isinstance(m.model, OllamaEmbeddingModel)
-        ],
-        key=lambda m: m.model.model_id,
-    )
-    assert len(registered_ollama_models) == len(expected)
-    for model, (name, aliases) in zip(registered_ollama_models, expected):
-        assert model.model.model_id == name
-        assert model.aliases == aliases
-
-
-@pytest.mark.parametrize(
-    ("envvar_value", "expected_truncate_value"),
-    [
-        (None, True),
-        ("True", True),
-        ("true", True),
-        ("yes", True),
-        ("y", True),
-        ("on", True),
-        ("False", False),
-        ("false", False),
-        ("no", False),
-        ("n", False),
-        ("off", False),
-    ],
-)
-def test_model_embed(
-    mocker,
-    envvar_value,
-    expected_truncate_value,
-    monkeypatch,
-):
-    expected = [0.1] * 1024
-
-    client = Mock()
-    client.embed.return_value = {"embeddings": [expected]}
-    mocker.patch("ollama.Client", return_value=client)
-
-    if envvar_value is not None:
-        monkeypatch.setenv("OLLAMA_EMBED_TRUNCATE", envvar_value)
-    else:
-        monkeypatch.delenv("OLLAMA_EMBED_TRUNCATE", raising=False)
-
-    result = OllamaEmbeddingModel("mxbai-embed-large:latest").embed("string to embed")
-    assert result == expected
-
-    _, called_kwargs = client.embed.call_args
-    assert called_kwargs.get("truncate") is expected_truncate_value
-
-
-def test_get_key_returns_none_when_no_key_is_configured(mocker):
-    """Ollama's key is optional, so resolution returns None instead of raising."""
-    mocker.patch("llm.get_key", return_value=None)
-
-    assert OllamaChatModel("llama2:7b").get_key() is None
-    assert OllamaEmbeddingModel("mxbai-embed-large:latest").get_key() is None
 
 
 def test_chat_key_reaches_client_as_bearer_token(mocker):
@@ -216,28 +115,6 @@ async def test_async_chat_key_reaches_client_as_bearer_token(mocker):
     )
 
     assert_bearer_token(client_class, "caller-key")
-
-
-def test_embed_key_reaches_client_as_bearer_token(mocker):
-    """A per-call key travels from embed() through to the client's auth header."""
-    client = Mock()
-    client.embed.return_value = {"embeddings": [[0.1]]}
-    client_class = mocker.patch("ollama.Client", return_value=client)
-
-    OllamaEmbeddingModel("mxbai-embed-large:latest").embed(
-        "string to embed", key="caller-key"
-    )
-
-    assert_bearer_token(client_class, "caller-key")
-
-
-def test_registered_models_when_ollama_is_down(mocker):
-    client = Mock()
-    client.list.side_effect = ConnectError("[Errno 111] Connection refused")
-    mocker.patch("ollama.Client", return_value=client)
-    assert not any(
-        isinstance(m.model, OllamaChatModel) for m in get_models_with_aliases()
-    )
 
 
 def test_sync_streaming_yields_text(mocker, mock_ollama_client):
