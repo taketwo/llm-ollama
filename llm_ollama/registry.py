@@ -1,6 +1,7 @@
 """Discovery of Ollama models and their registration with llm."""
 
 from collections import defaultdict
+from collections.abc import Iterator
 
 import llm
 
@@ -14,14 +15,7 @@ cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
 
 @llm.hookimpl
 def register_models(register, model_aliases=None):
-    models = defaultdict(list)
-    for model in get_ollama_models():
-        name, digest = model["model"], model["digest"]
-        models[digest].append(name)
-        if name.endswith(":latest"):
-            models[digest].append(name[: -len(":latest")])
-    for digest, names in models.items():
-        name, aliases = _pick_primary_name(names)
+    for digest, name, aliases in _distinct_models():
         capabilities = get_ollama_model_capabilities(digest, name)
         if "completion" not in capabilities:
             continue
@@ -35,14 +29,25 @@ def register_models(register, model_aliases=None):
 
 @llm.hookimpl
 def register_embedding_models(register):
-    models = defaultdict(list)
-    for model in get_ollama_models():
-        models[model["digest"]].append(model["model"])
-        if model["model"].endswith(":latest"):
-            models[model["digest"]].append(model["model"][: -len(":latest")])
-    for names in models.values():
-        name, aliases = _pick_primary_name(names)
+    for _, name, aliases in _distinct_models():
         register(OllamaEmbeddingModel(name), aliases=aliases)
+
+
+def _distinct_models() -> Iterator[tuple[str, str, tuple[str, ...]]]:
+    """Yield the digest, primary name and aliases of each model on the Ollama server.
+
+    Names that share a digest are one model, and a name tagged ``:latest`` also has
+    its bare form as an alias.
+    """
+    names_by_digest = defaultdict(list)
+    for model in get_ollama_models():
+        name, digest = model["model"], model["digest"]
+        names_by_digest[digest].append(name)
+        if name.endswith(":latest"):
+            names_by_digest[digest].append(name.removesuffix(":latest"))
+    for digest, names in names_by_digest.items():
+        name, aliases = _pick_primary_name(names)
+        yield digest, name, aliases
 
 
 def _pick_primary_name(names: list[str]) -> tuple[str, tuple[str, ...]]:
