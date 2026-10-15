@@ -160,6 +160,6 @@ def bare_env(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture(autouse=False)
 def _isolated_cache(tmp_path: Path) -> None:
     """Set isolated cache directory for each test."""
-    import llm_ollama
+    from llm_ollama import registry
 
-    llm_ollama.cache.set_dir(tmp_path / "test_cache")
+    registry.cache.set_dir(tmp_path / "test_cache")
