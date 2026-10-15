@@ -36,7 +36,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group.addoption(
         "--vision-model",
         action="store",
-        default="llama3.2-vision:11b",
+        default="gemma3:latest",
         help="specify a vision model to use for integration tests (has to be capable of vision)",
     )
 
