@@ -246,6 +246,37 @@ python3 -m venv .venv
 pip install -e '.[test,lint]'
 ```
 
+### Code layout
+
+```
+llm_ollama/
+  __init__.py     re-exports the hooks, nothing else
+  registry.py     model hooks, discovery, capability cache
+  commands.py     the `llm ollama models` command
+  tools.py        the plugin's own tools
+  auth.py         client creation from OLLAMA_HOST, OLLAMA_HEADERS and the API key
+  cache.py        on-disk cache decorator
+  models/
+    base.py       BaseMixin
+    chat.py       chat models, conversion of any llm.Tool for a chat request
+    embed.py      embedding model
+```
+
+- A module owns its `@llm.hookimpl` functions, and `__init__.py` re-exports them.
+- Imports run one way: `__init__` → `registry`, `commands`, `tools`; `commands` → `registry`; `registry` → `models`, `auth`, `cache`; `models` → `auth`; `tools` → `auth`. Nothing imports from `__init__`.
+- Inside `models/`, family modules import from `base.py` and never from each other.
+- A name that another module of the package imports is public, with no leading underscore. Tests may import private names.
+
+Each concrete model class lists a mixin of ours first, so that it overrides `__str__` and `get_key`, followed by one `llm` base class:
+
+```
+BaseMixin                      base.py; __str__, get_key
+├─ ChatMixin                   chat.py; options, attachment types, message building
+│  ├─ OllamaChatModel          + llm.KeyModel
+│  └─ AsyncOllamaChatModel     + llm.AsyncKeyModel
+└─ OllamaEmbeddingModel        embed.py; + llm.EmbeddingModel
+```
+
 ### Testing and linting
 
 To test or lint the code, first activate the environment:
@@ -276,6 +307,8 @@ The tests of each kind will be:
 - Force-disabled with `--no-<kind>`.
 
 To test with another model, pass `--<kind>-model`, for example `--chat-model qwen3:14b`.
+
+Unit tests mirror the package one to one: the tests for `llm_ollama/models/chat.py` are in `tests/unit/models/test_chat.py`. Integration tests go through `llm.get_model()` and exercise several modules at once, so they are named by the kind of model they need instead. Each integration file marks its kind once with `pytestmark` and gets the model name from the `model_name` fixture. To add a kind, add a row to `MODEL_KINDS` in `tests/conftest.py`, which generates its marker and options.
 
 To format the code:
 
