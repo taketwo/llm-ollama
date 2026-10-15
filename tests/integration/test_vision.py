@@ -3,11 +3,12 @@ import json
 import pytest
 from llm import Attachment, get_model, schema_dsl
 
+pytestmark = pytest.mark.vision
 
-@pytest.mark.vision
-def test_attachments(vision_model, box_png):
+
+def test_attachments(model_name, box_png):
     """Test attachment handling in conversations."""
-    model = get_model(vision_model)
+    model = get_model(model_name)
 
     response = model.prompt(
         "What is written in the image?",
@@ -22,10 +23,9 @@ Task: Warn about missing images/history. Keep replies short. Images are english 
     assert "shark" == json_response["text"].lower()
 
 
-@pytest.mark.vision
-def test_conversation_attachments(vision_model, box_png):
+def test_conversation_attachments(model_name, box_png):
     """Test attachment handling in conversations."""
-    model = get_model(vision_model)
+    model = get_model(model_name)
 
     convo = model.conversation()
 

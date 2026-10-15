@@ -262,11 +262,20 @@ To run automated unit and integration tests:
 python -m pytest
 ```
 
-Integration tests require a running Ollama server and will be:
-- Enabled automatically if an Ollama server is available;
-- Skipped if Ollama server is unavailable;
-- Force-enabled with `--integration` (but fail if Ollama server is unavailable);
-- Force-disabled with `--no-integration`.
+Unit tests live in `tests/unit` and mock the Ollama server. Integration tests live in `tests/integration` and need a running Ollama server. They are grouped by the kind of model they need:
+
+| Kind     | Default model   | Model must support          |
+|----------|-----------------|-----------------------------|
+| `chat`   | `qwen3:8b`      | completion, tools, thinking |
+| `vision` | `gemma3:latest` | completion, vision          |
+
+The tests of each kind will be:
+- Enabled automatically if the Ollama server has the model;
+- Skipped if the server is unavailable or does not have the model;
+- Force-enabled with `--<kind>` (but fail if the server or the model is unavailable);
+- Force-disabled with `--no-<kind>`.
+
+To test with another model, pass `--<kind>-model`, for example `--chat-model qwen3:14b`.
 
 To format the code:
 

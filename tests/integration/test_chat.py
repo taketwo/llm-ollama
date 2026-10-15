@@ -3,22 +3,22 @@ import json
 import pytest
 from llm import get_async_model, get_model, schema_dsl
 
+pytestmark = pytest.mark.chat
 
-@pytest.mark.integration
+
 @pytest.mark.asyncio
-async def test_async_model_prompt(integration_model):
+async def test_async_model_prompt(model_name):
     """Tests actual run."""
-    model = get_async_model(integration_model)
+    model = get_async_model(model_name)
     response = model.prompt("a short poem about tea")
     response_text = await response.text()
     assert len(response_text) > 0
 
 
-@pytest.mark.integration
 @pytest.mark.asyncio
-async def test_async_model_prompt_with_schema(integration_model):
+async def test_async_model_prompt_with_schema(model_name):
     """Tests actual run."""
-    model = get_async_model(integration_model)
+    model = get_async_model(model_name)
     response = model.prompt(
         "Describe a nice dog with a surprising name",
         schema=schema_dsl("name, age int, bio"),
@@ -32,15 +32,14 @@ async def test_async_model_prompt_with_schema(integration_model):
     assert isinstance(json_response["age"], int)
 
 
-@pytest.mark.integration
-def test_tools(integration_model):
+def test_tools(model_name):
     """Test tool execution."""
 
     def multiply(a: int, b: int):
         "Multiply two integers"
         return int(a) * int(b)
 
-    model = get_model(integration_model)
+    model = get_model(model_name)
     chain = model.chain(
         "What is 12345 * 4312? Use the available tools to compute the answer.",
         tools=[multiply],
@@ -50,9 +49,8 @@ def test_tools(integration_model):
     assert "53231640" in result or "53,231,640" in result
 
 
-@pytest.mark.integration
 @pytest.mark.asyncio
-async def test_async_tools(integration_model):
+async def test_async_tools(model_name):
     """Async streaming + tool execution end-to-end against a real Ollama server.
 
     The async streaming branch's tool-call capture was a recent fix and is not
@@ -64,7 +62,7 @@ async def test_async_tools(integration_model):
         "Multiply two integers"
         return int(a) * int(b)
 
-    model = get_async_model(integration_model)
+    model = get_async_model(model_name)
     chain = model.chain(
         "What is 12345 * 4312? Use the available tools to compute the answer.",
         tools=[multiply],
@@ -74,8 +72,7 @@ async def test_async_tools(integration_model):
     assert "53231640" in result or "53,231,640" in result
 
 
-@pytest.mark.integration
-def test_thinking_surfaces_reasoning_part(integration_model):
+def test_thinking_surfaces_reasoning_part(model_name):
     """A thinking-capable model produces a ReasoningPart when think=True.
 
     Catches breakage in the chunk.message.thinking → reasoning StreamEvent
@@ -84,7 +81,7 @@ def test_thinking_surfaces_reasoning_part(integration_model):
     """
     from llm.parts import ReasoningPart
 
-    model = get_model(integration_model)
+    model = get_model(model_name)
     response = model.prompt(
         "Compute 7 times 13 step by step. Show your reasoning.",
         options={"temperature": 0, "think": True},
