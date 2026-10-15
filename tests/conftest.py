@@ -150,22 +150,3 @@ def vision_model(vision_config: dict) -> str:
 def box_png() -> bytes:
     """A PNG image of the word "shark" in black on white."""
     return (Path(__file__).parent / "data" / "box.png").read_bytes()
-
-
-@pytest.fixture
-def bare_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Clear the variables client creation reads, so a test sets only what it is about.
-
-    This is not marked as autouse because the integration tests need a real OLLAMA_HOST
-    to reach a server.
-    """
-    for name in ("OLLAMA_HOST", "OLLAMA_HEADERS", "OLLAMA_API_KEY"):
-        monkeypatch.delenv(name, raising=False)
-
-
-@pytest.fixture(autouse=False)
-def _isolated_cache(tmp_path: Path) -> None:
-    """Set isolated cache directory for each test."""
-    from llm_ollama import registry
-
-    registry.cache.set_dir(tmp_path / "test_cache")
