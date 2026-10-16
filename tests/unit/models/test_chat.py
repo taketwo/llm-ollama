@@ -4,7 +4,8 @@ import llm
 import ollama
 import pytest
 from helpers import assert_bearer_token
-from llm import get_async_model, get_model
+from llm import Attachment, ToolResult, get_async_model, get_model
+from llm.parts import ReasoningPart
 
 from llm_ollama.models.chat import (
     AsyncOllamaChatModel,
@@ -277,11 +278,18 @@ def test_tool_conversion_kwargs_uses_input_schema():
     assert params.required == ["database", "sql"]
 
 
+def test_tool_conversion_without_implementation_raises():
+    tool = llm.Tool(name="t")
+
+    with pytest.raises(ValueError, match="'t' has no implementation"):
+        _llm_tool_to_ollama_tool(tool)
+
+
 def test_tool_conversion_kwargs_empty_schema():
     tool = llm.Tool(
         name="t",
         input_schema={"type": "object", "properties": {}},
-        implementation=lambda **kwargs: "x",
+        implementation=lambda **_kwargs: "x",
     )
     ollama_tool = _llm_tool_to_ollama_tool(tool)
 
@@ -301,8 +309,6 @@ def test_tool_conversion_name_and_description_override():
 
 def test_thinking_surfaces_as_reasoning_part(mocker, mock_ollama_client):
     """A chunk's thinking content lands as a ReasoningPart on the response."""
-    from llm.parts import ReasoningPart
-
     _install_sync_chat(
         mock_ollama_client,
         chunks=[
@@ -322,8 +328,6 @@ def test_thinking_surfaces_as_reasoning_part(mocker, mock_ollama_client):
 
 def test_hide_reasoning_suppresses_reasoning_events(mocker, mock_ollama_client):
     """prompt.hide_reasoning drops reasoning events without altering the request."""
-    from llm.parts import ReasoningPart
-
     client = _install_sync_chat(
         mock_ollama_client,
         chunks=[
@@ -402,8 +406,6 @@ async def test_async_streaming_reassembles_response_json(mocker, mock_ollama_cli
 
 def test_tool_call_reply_round_trip(mocker, mock_ollama_client):
     """response.reply() round-trips a tool call + result back into the next request."""
-    from llm import ToolResult
-
     mock_ollama_client.chat.side_effect = [
         iter(
             [
@@ -450,8 +452,6 @@ def test_tool_call_reply_round_trip(mocker, mock_ollama_client):
 
 def test_build_messages_handles_multi_attachment_history(mock_ollama_client, box_png):
     """A conversation with attachments across turns survives the new Part chain."""
-    from llm import Attachment
-
     att_a = Attachment(content=box_png, type="image/png")
     att_b = Attachment(content=box_png + b"\x00", type="image/png")
 

@@ -1,7 +1,7 @@
 """Discovery of Ollama models and their registration with llm."""
 
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 import llm
 
@@ -14,7 +14,8 @@ cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
 
 
 @llm.hookimpl
-def register_models(register, model_aliases=None):
+def register_models(register: Callable[..., None]) -> None:
+    """Register a chat model for each Ollama model that supports completion."""
     for digest, name, aliases in _distinct_models():
         capabilities = get_ollama_model_capabilities(digest, name)
         if "completion" not in capabilities:
@@ -28,7 +29,8 @@ def register_models(register, model_aliases=None):
 
 
 @llm.hookimpl
-def register_embedding_models(register):
+def register_embedding_models(register: Callable[..., None]) -> None:
+    """Register an embedding model for each distinct Ollama model."""
     for _, name, aliases in _distinct_models():
         register(OllamaEmbeddingModel(name), aliases=aliases)
 
@@ -85,12 +87,16 @@ def get_ollama_models() -> list[dict]:
     """List the models on the Ollama server; empty if the server cannot be queried."""
     try:
         return get_client().list()["models"]
-    except Exception:
+    except Exception:  # noqa: BLE001
         return []
 
 
+# `digest` is unused in the body; the cache reads it by name as the cache key.
 @cache("model_capabilities", key="digest")
-def get_ollama_model_capabilities(digest: str, model: str) -> list[str]:
+def get_ollama_model_capabilities(
+    digest: str,  # noqa: ARG001
+    model: str,
+) -> list[str]:
     """Return the capabilities the Ollama server reports for a model.
 
     The result is cached on disk by ``digest``, so the server is asked about ``model``

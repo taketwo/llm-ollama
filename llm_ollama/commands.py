@@ -1,5 +1,6 @@
 """The ``llm ollama`` command group."""
 
+import click
 import llm
 from llm.utils import dicts_to_table_string
 
@@ -7,7 +8,9 @@ from llm_ollama.registry import get_ollama_model_capabilities, get_ollama_models
 
 
 @llm.hookimpl
-def register_commands(cli):
+def register_commands(cli: click.Group) -> None:
+    """Add the ``ollama`` command group to the ``llm`` CLI."""
+
     @cli.group(name="ollama")
     def ollama_group() -> None:
         """Commands for working with models hosted on Ollama server."""

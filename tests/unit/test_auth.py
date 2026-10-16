@@ -72,7 +72,7 @@ class TestClientCreation:
         monkeypatch.setenv("OLLAMA_HOST", "http://user:pass@example.com:8080")
         mock_basic_auth.return_value = mock_auth_instance = Mock()
         client.create()
-        mock_basic_auth.assert_called_once_with(username="user", password="pass")
+        mock_basic_auth.assert_called_once_with(username="user", password="pass")  # noqa: S106
         client.cls.assert_called_once_with(
             host="http://example.com:8080",
             auth=mock_auth_instance,
