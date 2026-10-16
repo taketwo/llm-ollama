@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-import ollama
 import pytest
+
+from llm_ollama.auth import get_client
 
 
 @dataclass(frozen=True)
@@ -22,8 +23,6 @@ MODEL_KINDS = (
     ModelKind("chat", "qwen3:8b", ("completion", "tools", "thinking")),
     ModelKind("vision", "gemma3:latest", ("completion", "vision")),
 )
-
-ENABLED_KINDS = pytest.StashKey[set[str]]()
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -60,48 +59,65 @@ def pytest_configure(config: pytest.Config) -> None:
             )
 
 
-def pytest_sessionstart(session: pytest.Session) -> None:
-    """Decide which model kinds to test.
-
-    A kind is enabled when the Ollama server has its model, unless ``--no-<kind>`` is
-    given. With ``--<kind>``, the run stops if the server cannot be queried or lacks the
-    model.
-    """
-    config = session.config
-    enabled = set()
-    for kind in MODEL_KINDS:
-        if config.getoption(f"--no-{kind.name}"):
-            continue
-        forced = config.getoption(f"--{kind.name}")
-        model = config.getoption(f"--{kind.name}-model")
-        try:
-            server_models = ollama.list()["models"]
-        except Exception as error:
-            if forced:
-                pytest.exit(
-                    f"--{kind.name} given but Ollama discovery failed: {error}", 1
-                )
-            continue
-        if any(model in server_model.model for server_model in server_models):
-            enabled.add(kind.name)
-        elif forced:
-            pytest.exit(f"--{kind.name} given but model {model} is not available", 1)
-    config.stash[ENABLED_KINDS] = enabled
-
-
+# Last, so that -k and -m have already deselected tests
+@pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(
     config: pytest.Config,
     items: list[pytest.Item],
 ) -> None:
-    """Skip the tests of each model kind that is not enabled."""
-    enabled = config.stash[ENABLED_KINDS]
-    for kind in MODEL_KINDS:
-        if kind.name in enabled:
+    """Skip the tests of each model kind that is not enabled.
+
+    A kind is enabled when the Ollama server has its model, unless ``--no-<kind>`` is
+    given. With ``--<kind>``, the run stops if the server cannot be queried or lacks the
+    model. Kinds without selected tests are not checked, so a run without integration
+    tests does not contact the server.
+    """
+    tests_by_kind = {
+        kind: [item for item in items if item.get_closest_marker(kind.name)]
+        for kind in MODEL_KINDS
+    }
+    kinds_to_check = [
+        kind
+        for kind, tests in tests_by_kind.items()
+        if tests and not config.getoption(f"--no-{kind.name}")
+    ]
+    enabled = _find_served_kinds(config, kinds_to_check) if kinds_to_check else set()
+    for kind, tests in tests_by_kind.items():
+        if kind in enabled:
             continue
         skip = pytest.mark.skip(reason=f"{kind.name} tests disabled")
-        for item in items:
-            if item.get_closest_marker(kind.name):
-                item.add_marker(skip)
+        for test in tests:
+            test.add_marker(skip)
+
+
+def _find_served_kinds(
+    config: pytest.Config,
+    kinds: list[ModelKind],
+) -> set[ModelKind]:
+    """Return those of ``kinds`` whose model the Ollama server has.
+
+    Stops the run if a kind given as ``--<kind>`` is not among them.
+    """
+    try:
+        server_names = {model["model"] for model in get_client().list()["models"]}
+    except Exception as error:
+        for kind in kinds:
+            if config.getoption(f"--{kind.name}"):
+                pytest.exit(
+                    f"--{kind.name} given but Ollama discovery failed: {error}", 1
+                )
+        return set()
+    served_kinds = set()
+    for kind in kinds:
+        model_name = config.getoption(f"--{kind.name}-model")
+        # The plugin also registers a model tagged :latest under its bare name
+        if model_name in server_names or f"{model_name}:latest" in server_names:
+            served_kinds.add(kind)
+        elif config.getoption(f"--{kind.name}"):
+            pytest.exit(
+                f"--{kind.name} given but model {model_name} is not available", 1
+            )
+    return served_kinds
 
 
 @pytest.fixture
