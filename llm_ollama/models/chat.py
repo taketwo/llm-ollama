@@ -8,6 +8,7 @@ import llm
 import ollama
 from llm.parts import (
     AttachmentPart,
+    Message,
     ReasoningPart,
     StreamEvent,
     TextPart,
@@ -114,54 +115,7 @@ class ChatMixin(BaseMixin):
 
         messages: list[dict] = []
         for message in prompt.messages:
-            text_chunks: list[str] = []
-            images: list[str] = []
-            tool_calls: list[ollama.Message.ToolCall] = []
-            tool_results: list[ToolResultPart] = []
-            for part in message.parts:
-                if isinstance(part, TextPart):
-                    text_chunks.append(part.text)
-                elif isinstance(part, AttachmentPart):
-                    if part.attachment is not None:
-                        images.append(part.attachment.base64_content())
-                elif isinstance(part, ToolCallPart):
-                    tool_calls.append(
-                        ollama.Message.ToolCall(
-                            function=ollama.Message.ToolCall.Function(
-                                name=part.name,
-                                arguments=part.arguments or {},
-                            ),
-                        ),
-                    )
-                elif isinstance(part, ToolResultPart):
-                    tool_results.append(part)
-                elif isinstance(part, ReasoningPart):
-                    # Ollama does not accept reasoning input back; thinking
-                    # models keep their own state. Drop silently.
-                    continue
-
-            # ToolResultParts always become standalone {"role": "tool", ...}
-            # messages on the wire — Ollama keys them by tool name, not by
-            # being grouped into a parent message.
-            messages.extend(
-                {
-                    "role": "tool",
-                    "content": tool_result.output,
-                    "name": tool_result.name,
-                }
-                for tool_result in tool_results
-            )
-
-            if not text_chunks and not images and not tool_calls:
-                continue
-
-            wire: dict = {"role": message.role, "content": "".join(text_chunks)}
-            if images:
-                wire["images"] = images
-            if tool_calls:
-                wire["tool_calls"] = tool_calls
-            messages.append(wire)
-
+            messages.extend(_convert_message(message))
         return messages
 
     def _prepare_chat_kwargs(self, prompt: llm.Prompt) -> tuple[dict, dict]:
@@ -363,6 +317,61 @@ class _ChunkAccumulator:
             input=self._final_chunk.prompt_eval_count,
             output=self._final_chunk.eval_count,
         )
+
+
+def _convert_message(message: Message) -> list[dict]:
+    """Convert one ``llm`` message into the Ollama chat messages it stands for.
+
+    Returns the message's tool results as standalone ``"tool"`` messages, followed by
+    the message itself unless it has no text, images or tool calls.
+    """
+    text_chunks: list[str] = []
+    images: list[str] = []
+    tool_calls: list[ollama.Message.ToolCall] = []
+    tool_results: list[ToolResultPart] = []
+    for part in message.parts:
+        if isinstance(part, TextPart):
+            text_chunks.append(part.text)
+        elif isinstance(part, AttachmentPart) and part.attachment is not None:
+            images.append(part.attachment.base64_content())
+        elif isinstance(part, ToolCallPart):
+            tool_calls.append(
+                ollama.Message.ToolCall(
+                    function=ollama.Message.ToolCall.Function(
+                        name=part.name,
+                        arguments=part.arguments or {},
+                    ),
+                ),
+            )
+        elif isinstance(part, ToolResultPart):
+            tool_results.append(part)
+        elif isinstance(part, ReasoningPart):
+            # Ollama does not accept reasoning input back; thinking
+            # models keep their own state. Drop silently.
+            continue
+
+    # ToolResultParts always become standalone {"role": "tool", ...}
+    # messages on the wire — Ollama keys them by tool name, not by
+    # being grouped into a parent message.
+    wire_messages: list[dict] = [
+        {
+            "role": "tool",
+            "content": tool_result.output,
+            "name": tool_result.name,
+        }
+        for tool_result in tool_results
+    ]
+
+    if not text_chunks and not images and not tool_calls:
+        return wire_messages
+
+    wire: dict = {"role": message.role, "content": "".join(text_chunks)}
+    if images:
+        wire["images"] = images
+    if tool_calls:
+        wire["tool_calls"] = tool_calls
+    wire_messages.append(wire)
+    return wire_messages
 
 
 def _llm_tool_to_ollama_tool(tool: llm.Tool) -> ollama.Tool:
