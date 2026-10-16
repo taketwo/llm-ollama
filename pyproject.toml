@@ -18,7 +18,10 @@ Issues = "https://github.com/taketwo/llm-ollama/issues"
 ollama = "llm_ollama"
 
 [project.optional-dependencies]
-lint = ["ruff", "ty"]
+lint = [
+  "ruff==0.17.1",
+  "ty==0.0.89",
+]
 test = ["pytest", "pytest-asyncio", "pytest-cov", "pytest-mock"]
 
 [dependency-groups]

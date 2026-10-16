@@ -6,6 +6,11 @@ default:
 setup:
     uv sync --extra test --extra lint
 
+# Pin ruff and ty to their latest releases
+upgrade-checkers: && setup
+    uv remove --optional lint --no-sync ruff ty
+    uv add --optional lint --bounds exact --no-sync ruff ty
+
 # Run all checks
 check: check-format check-lint check-type
 
