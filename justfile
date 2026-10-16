@@ -7,7 +7,7 @@ setup:
     uv sync --extra test --extra lint
 
 # Run all checks
-check: check-format check-type
+check: check-format check-lint check-type
 
 # Run type checking
 check-type:
@@ -17,9 +17,20 @@ check-type:
 check-format:
     .venv/bin/ruff format --check .
 
+# Run linting checks
+check-lint:
+    .venv/bin/ruff check .
+
+# Auto-fix linting issues and auto-format code
+fix: fix-lint fix-format
+
 # Auto-format code
 fix-format:
     .venv/bin/ruff format .
+
+# Auto-fix linting issues
+fix-lint:
+    .venv/bin/ruff check --fix .
 
 # Run tests with coverage; extra args are passed through, e.g. just test -k auth
 test *ARGS:
