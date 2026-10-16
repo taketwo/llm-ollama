@@ -24,6 +24,10 @@ test = ["pytest", "pytest-asyncio", "pytest-cov", "pytest-mock"]
 [dependency-groups]
 dev = ["typing-extensions>=4.15.0"]
 
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
 [tool.setuptools.packages.find]
 include = ["llm_ollama*"]
 
