@@ -1,7 +1,7 @@
 """Fixtures for unit tests.
 
-The autouse fixtures isolate each test from the developer's environment and capability
-cache, which integration tests rely on, so they live here rather than in the root
+The autouse fixtures isolate each test from the developer's environment and llm user
+directory, which integration tests rely on, so they live here rather than in the root
 conftest.
 """
 
@@ -21,8 +21,11 @@ def bare_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _isolated_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Give each test an empty capability cache in place of the user's."""
+def _isolated_user_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Give each test an empty llm user directory and capability cache."""
+    monkeypatch.setenv("LLM_USER_PATH", str(tmp_path))
+    # The cache resolved its directory when registry was imported, before LLM_USER_PATH
+    # was set here
     monkeypatch.setattr(registry.cache, "cache_dir", tmp_path)
 
 
