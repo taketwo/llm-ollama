@@ -1,5 +1,6 @@
 from unittest.mock import Mock
 
+import pytest
 from httpx import ConnectError
 from llm import get_embedding_models_with_aliases, get_models_with_aliases
 from llm.plugins import load_plugins, pm
@@ -60,3 +61,9 @@ def test_registered_models_when_ollama_is_down(mocker):
     assert not any(
         isinstance(m.model, OllamaChatModel) for m in get_models_with_aliases()
     )
+
+
+def test_interrupt_during_discovery_propagates(mock_ollama_client):
+    mock_ollama_client.list.side_effect = KeyboardInterrupt
+    with pytest.raises(KeyboardInterrupt):
+        get_models_with_aliases()

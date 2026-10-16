@@ -85,7 +85,7 @@ def get_ollama_models() -> list[dict]:
     """List the models on the Ollama server; empty if the server cannot be queried."""
     try:
         return get_client().list()["models"]
-    except:
+    except Exception:
         return []
 
 
