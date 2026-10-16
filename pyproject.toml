@@ -28,9 +28,46 @@ dev = ["typing-extensions>=4.15.0"]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools.packages.find]
-include = ["llm_ollama*"]
-
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
 pythonpath = ["tests"]
+
+[tool.ruff]
+line-length = 88
+lint.select = ["ALL"]
+lint.ignore = [
+  "ANN003",                           # kwargs argument without type annotation is okay
+  "COM812",                           # conflicts with ruff formatter
+  "CPY001",                           # no need to put copyright notice in every file
+  "D100",                             # missing docstring in public module is okay
+  "D104",                             # missing docstring in public package is okay
+  "D203",                             # conflicts with D211
+  "D213",                             # conflicts with D212
+  "E501",
+  "EM",                               # noisy warnings about need to store exception messages in variables
+  "ERA001",                           # has false positives
+  "FA102",                            # no need to import from __future__ to support fancy annotations
+  "FIX002",                           # not every TODO comment needs to be fixed
+  "S603",                             # calling subprocess with shell=True is okay
+  "T20",                              # print statements are okay
+  "TD002",                            # no need to mention author in TODO comments (use git blame instead)
+  "TD003",                            # no need to create ticket for every TODO comment
+  "TRY003",                           # it is okay to specify long descriptive messages in exceptions
+]
+lint.isort.combine-as-imports = true
+lint.per-file-ignores."tests/**" = [
+  "ANN",                              # type annotations are not required in tests
+  "ARG001",                           # "unused" function arguments are needed to pass mock objects
+  "ARG002",                           # fixture arguments are used for side effects, not their value
+  "D",                                # docstrings are not required in tests
+  "INP001",                           # tests/ is an implicit namespace package
+  "PLR0913",                          # pytest fixtures inflate argument counts
+  "PLR0917",                          # pytest fixtures inflate positional argument counts
+  "PLR2004",                          # magic values are allowed in tests
+  "S101",                             # asserts are allowed in tests
+  "SLF001",                           # accessing private members is acceptable in tests
+  "TC002",                            # TYPE_CHECKING imports are not required in tests
+]
+
+[tool.setuptools.packages.find]
+include = ["llm_ollama*"]

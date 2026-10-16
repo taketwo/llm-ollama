@@ -310,8 +310,9 @@ To test with another model, pass `--<kind>-model`, for example `--chat-model qwe
 
 Unit tests mirror the package one to one: the tests for `llm_ollama/models/chat.py` are in `tests/unit/models/test_chat.py`. Integration tests go through `llm.get_model()` and exercise several modules at once, so they are named by the kind of model they need instead. Each integration file marks its kind once with `pytestmark` and gets the model name from the `model_name` fixture. To add a kind, add a row to `MODEL_KINDS` in `tests/conftest.py`, which generates its marker and options.
 
-To format the code:
+To lint and format the code:
 
 ```bash
+python -m ruff check --fix .
 python -m ruff format .
 ```
