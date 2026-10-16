@@ -60,6 +60,35 @@ class Cache:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
+    def _load(self, cache_file: Path) -> dict[str, Any]:
+        """Load the contents of a cache file, discarding anything unusable.
+
+        Parameters
+        ----------
+        cache_file : Path
+            The YAML file to read.
+
+        Returns
+        -------
+        dict[str, Any]
+            The cached contents, or an empty cache of the current version if the file
+            is missing, unparseable, or written under a different ``CACHE_VERSION``.
+
+        """
+        cache: dict[str, Any] = {}
+        try:
+            with cache_file.open("r") as f:
+                loaded_cache = yaml.safe_load(f)
+                if loaded_cache is not None:
+                    cache = loaded_cache
+        except (FileNotFoundError, yaml.scanner.ScannerError):
+            pass
+
+        # Invalidate cache if version is not present or has changed
+        if "version" not in cache or cache["version"] != self.CACHE_VERSION:
+            cache = {"version": self.CACHE_VERSION, "data": {}}
+        return cache
+
     def __call__(
         self, cache_name: str, key: str
     ) -> Callable[[Callable[P, R]], Callable[P, R]]:
@@ -100,18 +129,7 @@ class Cache:
                     ) from e
 
                 cache_file = self.cache_dir / f"{cache_name}.yaml"
-                cache: dict[str, Any] = {}
-                try:
-                    with cache_file.open("r") as f:
-                        loaded_cache = yaml.safe_load(f)
-                        if loaded_cache is not None:
-                            cache = loaded_cache
-                except (FileNotFoundError, yaml.scanner.ScannerError):
-                    pass
-
-                # Invalidate cache if version is not present or has changed
-                if "version" not in cache or cache["version"] != self.CACHE_VERSION:
-                    cache = {"version": self.CACHE_VERSION, "data": {}}
+                cache = self._load(cache_file)
 
                 if cache_key in cache["data"]:
                     return cache["data"][cache_key]
