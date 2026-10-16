@@ -2,11 +2,15 @@
 
 import functools
 import inspect
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, ParamSpec, TypeVar
 
 import yaml
 import yaml.scanner
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 class Cache:
@@ -56,7 +60,9 @@ class Cache:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-    def __call__(self, cache_name: str, key: str):
+    def __call__(
+        self, cache_name: str, key: str
+    ) -> Callable[[Callable[P, R]], Callable[P, R]]:
         """Decorate function to cache results based on parameter values.
 
         Parameters
@@ -72,12 +78,12 @@ class Cache:
         if not isinstance(key, str):
             raise TypeError("Key must be a string parameter name")
 
-        def decorator(func):
+        def decorator(func: Callable[P, R]) -> Callable[P, R]:
             sig = inspect.signature(func)
             param_names = list(sig.parameters.keys())
 
             @functools.wraps(func)
-            def wrapper(*args, **kwargs):
+            def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                 if key in kwargs:
                     cache_key = kwargs[key]
                 elif key in param_names and param_names.index(key) < len(args):

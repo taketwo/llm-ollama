@@ -2,6 +2,7 @@ import json
 
 import pytest
 from llm import get_async_model, get_model, schema_dsl
+from llm.parts import ReasoningPart
 
 pytestmark = pytest.mark.chat
 
@@ -79,8 +80,6 @@ def test_thinking_surfaces_reasoning_part(model_name):
     mapping that mocks cannot see, e.g. if Ollama relocates the field or
     changes its shape across versions.
     """
-    from llm.parts import ReasoningPart
-
     model = get_model(model_name)
     response = model.prompt(
         "Compute 7 times 13 step by step. Show your reasoning.",

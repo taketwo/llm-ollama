@@ -1,7 +1,8 @@
 """Chat models served by Ollama."""
 
 import json
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
+from typing import ClassVar, cast
 
 import llm
 import ollama
@@ -22,10 +23,12 @@ from llm_ollama.models.base import BaseMixin
 
 
 class ChatMixin(BaseMixin):
+    """Request building shared by the sync and async Ollama chat models."""
+
     can_stream: bool = True
     supports_schema: bool = True
     supports_tools: bool = True
-    attachment_types = {
+    attachment_types: ClassVar[set[str]] = {
         "image/png",
         "image/jpeg",
         "image/webp",
@@ -90,12 +93,19 @@ class ChatMixin(BaseMixin):
     def __init__(
         self,
         model_id: str,
+        *,
         supports_tools: bool = True,
     ) -> None:
+        """Create the model; ``supports_tools`` says whether it accepts tool definitions."""
         self.model_id = model_id
         self.supports_tools = supports_tools
 
-    def build_messages(self, prompt, conversation):
+    def build_messages(
+        self,
+        prompt: llm.Prompt,
+        conversation: llm.Conversation | llm.AsyncConversation | None,
+    ) -> list[dict]:
+        """Convert ``prompt.messages`` into the ``messages`` list of an Ollama chat call."""
         # `conversation` is unused: under the llm 0.32 contract the framework
         # pre-bakes prior turns into prompt.messages, so walking conversation
         # here would double-emit history. The argument stays on the signature
@@ -133,14 +143,14 @@ class ChatMixin(BaseMixin):
             # ToolResultParts always become standalone {"role": "tool", ...}
             # messages on the wire — Ollama keys them by tool name, not by
             # being grouped into a parent message.
-            for tool_result in tool_results:
-                messages.append(
-                    {
-                        "role": "tool",
-                        "content": tool_result.output,
-                        "name": tool_result.name,
-                    },
-                )
+            messages.extend(
+                {
+                    "role": "tool",
+                    "content": tool_result.output,
+                    "name": tool_result.name,
+                }
+                for tool_result in tool_results
+            )
 
             if not text_chunks and not images and not tool_calls:
                 continue
@@ -154,7 +164,7 @@ class ChatMixin(BaseMixin):
 
         return messages
 
-    def _prepare_chat_kwargs(self, prompt) -> tuple[dict, dict]:
+    def _prepare_chat_kwargs(self, prompt: llm.Prompt) -> tuple[dict, dict]:
         """Build the ``options`` and ``kwargs`` dicts for an Ollama chat call.
 
         Splits prompt options into Ollama "options" (model parameters) and top-level
@@ -172,19 +182,26 @@ class ChatMixin(BaseMixin):
         elif prompt.schema:
             kwargs["format"] = prompt.schema
         if prompt.tools:
-            kwargs["tools"] = [_llm_tool_to_ollama_tool(tool) for tool in prompt.tools]
+            # supported_server_side_tools is empty, so llm rejects ServerSideTool earlier.
+            kwargs["tools"] = [
+                _llm_tool_to_ollama_tool(cast("llm.Tool", tool))
+                for tool in prompt.tools
+            ]
         return options, kwargs
 
 
 class OllamaChatModel(ChatMixin, llm.KeyModel):
+    """A chat model served by Ollama."""
+
     def execute(
         self,
         prompt: llm.Prompt,
-        stream: bool,
+        stream: bool,  # noqa: FBT001
         response: llm.Response,
         conversation: llm.Conversation | None = None,
         key: str | None = None,
-    ):
+    ) -> Iterator[StreamEvent]:
+        """Run the prompt on the Ollama server, yielding events as they arrive."""
         messages = self.build_messages(prompt, conversation)
         options, kwargs = self._prepare_chat_kwargs(prompt)
         accumulator = _ChunkAccumulator(response, hide_reasoning=prompt.hide_reasoning)
@@ -211,10 +228,12 @@ class OllamaChatModel(ChatMixin, llm.KeyModel):
 
 
 class AsyncOllamaChatModel(ChatMixin, llm.AsyncKeyModel):
+    """An asynchronous chat model served by Ollama."""
+
     async def execute(
         self,
         prompt: llm.Prompt,
-        stream: bool,
+        stream: bool,  # noqa: FBT001
         response: llm.AsyncResponse,
         conversation: llm.AsyncConversation | None = None,
         key: str | None = None,
@@ -231,6 +250,8 @@ class AsyncOllamaChatModel(ChatMixin, llm.AsyncKeyModel):
             The response object to populate.
         conversation : llm.AsyncConversation | None, optional
             The conversation context.
+        key : str | None, optional
+            API key for the Ollama server.
 
         """
         messages = self.build_messages(prompt, conversation)
@@ -356,10 +377,16 @@ def _llm_tool_to_ollama_tool(tool: llm.Tool) -> ollama.Tool:
     tool : llm.Tool
         An llm.Tool instance with a callable implementation.
 
+    Raises
+    ------
+    ValueError
+        If ``tool`` has no implementation.
+
     """
-    assert tool.implementation is not None
+    if tool.implementation is None:
+        raise ValueError(f"Tool {tool.name!r} has no implementation")
     ollama_tool = convert_function_to_tool(tool.implementation)
-    assert ollama_tool.function is not None
+    assert ollama_tool.function is not None  # noqa: S101
     ollama_tool.function.name = tool.name
     if tool.description:
         ollama_tool.function.description = tool.description

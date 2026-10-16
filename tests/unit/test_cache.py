@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, create_autospec, patch
 
 import pytest
 import yaml
@@ -26,7 +26,7 @@ def func(value):
 @pytest.fixture
 def func_instrumented():
     """Fixture providing an instrumented version of the sample function."""
-    return Mock(side_effect=func)
+    return create_autospec(func, side_effect=func)
 
 
 @pytest.fixture
@@ -52,9 +52,7 @@ class TestCacheDecorator:
     def test_basic_caching(self, cache, cache_dir, func_instrumented):
         """Test basic function caching functionality."""
 
-        func_decorated = cache("sample", key="value")(
-            lambda value: func_instrumented(value),
-        )
+        func_decorated = cache("sample", key="value")(func_instrumented)
 
         assert func_decorated("foo") == func("foo")
         assert func_instrumented.call_count == 1
@@ -132,9 +130,7 @@ class TestCacheInvalidation:
         """Test that changing cache version invalidates the cache."""
 
         cache1 = Cache(cache_dir)
-        func_decorated1 = cache1("sample", key="value")(
-            lambda value: func_instrumented(value),
-        )
+        func_decorated1 = cache1("sample", key="value")(func_instrumented)
 
         func_decorated1("test")
         assert func_instrumented.call_count == 1
@@ -145,9 +141,7 @@ class TestCacheInvalidation:
         current_cache_version = Cache.CACHE_VERSION
         with patch.object(Cache, "CACHE_VERSION", current_cache_version + 1):
             cache2 = Cache(cache_dir)
-            func_decorated2 = cache2("sample", key="value")(
-                lambda value: func_instrumented(value),
-            )
+            func_decorated2 = cache2("sample", key="value")(func_instrumented)
 
             # Should not use old cache due to version change
             func_decorated2("test")
@@ -167,9 +161,7 @@ class TestCacheInvalidation:
         cache_file = cache_dir / "invalid.yaml"
         cache_file.write_text(content)
 
-        func_decorated = cache("invalid", key="value")(
-            lambda value: func_instrumented(value),
-        )
+        func_decorated = cache("invalid", key="value")(func_instrumented)
 
         result = func_decorated("test")
         assert result == func("test")
@@ -203,9 +195,7 @@ class TestSetDir:
     ):
         """Test that set_dir affects where cache files are created."""
 
-        func_decorated = cache("sample", key="value")(
-            lambda value: func_instrumented(value),
-        )
+        func_decorated = cache("sample", key="value")(func_instrumented)
 
         assert func_decorated("foo") == func("foo")
         assert func_instrumented.call_count == 1

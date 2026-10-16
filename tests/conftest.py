@@ -100,7 +100,7 @@ def _find_served_kinds(
     """
     try:
         server_names = {model["model"] for model in get_client().list()["models"]}
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001
         for kind in kinds:
             if config.getoption(f"--{kind.name}"):
                 pytest.exit(

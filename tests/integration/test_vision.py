@@ -20,7 +20,7 @@ Task: Warn about missing images/history. Keep replies short. Images are english 
     response_text = response.text()
     assert len(response_text) > 0
     json_response = json.loads(response_text)
-    assert "shark" == json_response["text"].lower()
+    assert json_response["text"].lower() == "shark"
 
 
 def test_conversation_attachments(model_name, box_png):
@@ -50,4 +50,4 @@ Task: Warn about missing images/history. Keep replies short. Images are one basi
     response_text = response.text()
     assert len(response_text) > 0
     json_response = json.loads(response_text)
-    assert "shark" == json_response["text"].lower()
+    assert json_response["text"].lower() == "shark"
