@@ -24,7 +24,7 @@ def register_models(register: Callable[..., None]) -> None:
         register(
             OllamaChatModel(name, supports_tools=supports_tools),
             AsyncOllamaChatModel(name, supports_tools=supports_tools),
-            aliases=aliases,
+            aliases=[f"ollama/{alias}" for alias in aliases],
         )
 
 
@@ -32,7 +32,9 @@ def register_models(register: Callable[..., None]) -> None:
 def register_embedding_models(register: Callable[..., None]) -> None:
     """Register an embedding model for each distinct Ollama model."""
     for _, name, aliases in _distinct_models():
-        register(OllamaEmbeddingModel(name), aliases=aliases)
+        register(
+            OllamaEmbeddingModel(name), aliases=[f"ollama/{alias}" for alias in aliases]
+        )
 
 
 def _distinct_models() -> Iterator[tuple[str, str, tuple[str, ...]]]:

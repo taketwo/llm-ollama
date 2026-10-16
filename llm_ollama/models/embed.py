@@ -21,7 +21,8 @@ class OllamaEmbeddingModel(BaseMixin, llm.EmbeddingModel):
 
     def __init__(self, model_id: str) -> None:
         """Create the model; truncation follows ``OLLAMA_EMBED_TRUNCATE``, default on."""
-        self.model_id = model_id
+        self.model_id = f"ollama/{model_id}"
+        self.ollama_model_id = model_id
         self.truncate = True
 
         # Read OLLAMA_EMBED_TRUNCATE environment variable to decide if truncation
@@ -41,7 +42,7 @@ class OllamaEmbeddingModel(BaseMixin, llm.EmbeddingModel):
     ) -> Iterator[list[float]]:
         """Embed each of ``items`` on the Ollama server, yielding one vector per item."""
         result = get_client(key=key).embed(
-            model=self.model_id,
+            model=self.ollama_model_id,
             # supports_binary is False, so llm passes only strings.
             input=cast("Sequence[str]", items),
             truncate=self.truncate,

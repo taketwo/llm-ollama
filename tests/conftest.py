@@ -131,7 +131,7 @@ def model_name(request: pytest.FixtureRequest) -> str:
         for candidate in MODEL_KINDS
         if request.node.get_closest_marker(candidate.name)
     ]
-    return request.config.getoption(f"--{kind.name}-model")
+    return f"ollama/{request.config.getoption(f'--{kind.name}-model')}"
 
 
 @pytest.fixture

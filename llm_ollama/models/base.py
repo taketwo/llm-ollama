@@ -11,6 +11,7 @@ class BaseMixin:
     """
 
     model_id: str
+    ollama_model_id: str
 
     def __str__(self) -> str:
         """Return the model's display name, prefixed with ``Ollama:``."""

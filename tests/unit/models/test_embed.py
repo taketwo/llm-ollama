@@ -39,10 +39,13 @@ def test_model_embed(
     else:
         monkeypatch.delenv("OLLAMA_EMBED_TRUNCATE", raising=False)
 
-    result = OllamaEmbeddingModel("mxbai-embed-large:latest").embed("string to embed")
+    model = OllamaEmbeddingModel("mxbai-embed-large:latest")
+    assert model.model_id == "ollama/mxbai-embed-large:latest"
+    result = model.embed("string to embed")
     assert result == expected
 
     _, called_kwargs = client.embed.call_args
+    assert called_kwargs["model"] == "mxbai-embed-large:latest"
     assert called_kwargs.get("truncate") is expected_truncate_value
 
 
