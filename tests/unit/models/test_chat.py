@@ -471,3 +471,29 @@ def test_build_messages_handles_multi_attachment_history(mock_ollama_client, box
     assert len(user_messages) == 2
     assert user_messages[0]["images"] == [att_a.base64_content()]
     assert user_messages[1]["images"] == [att_b.base64_content()]
+
+
+def test_build_messages_drops_reasoning_from_history(mock_ollama_client):
+    """A prior turn's reasoning stays out of the next request; its text goes back."""
+    mock_ollama_client.chat.side_effect = [
+        iter(
+            [
+                _ollama_chunk(thinking="Let me think..."),
+                _ollama_chunk("Final answer", done=True, usage=True),
+            ],
+        ),
+        iter([_ollama_chunk("Follow-up answer", done=True, usage=True)]),
+    ]
+
+    conversation = get_model("deepseek-r1:70b").conversation()
+    first = conversation.prompt("Dummy Prompt")
+    first.text()
+    assert any(isinstance(p, ReasoningPart) for p in first.messages()[-1].parts)
+    conversation.prompt("Follow-up prompt").text()
+
+    second_messages = mock_ollama_client.chat.call_args_list[1].kwargs["messages"]
+    assert second_messages == [
+        {"role": "user", "content": "Dummy Prompt"},
+        {"role": "assistant", "content": "Final answer"},
+        {"role": "user", "content": "Follow-up prompt"},
+    ]
