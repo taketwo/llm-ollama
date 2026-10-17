@@ -40,3 +40,8 @@ fix-lint:
 # Run tests with coverage; extra args are passed through, e.g. just test -k auth
 test *ARGS:
     .venv/bin/pytest --cov=llm_ollama --cov-report=term-missing {{ARGS}}
+
+# Bump the version (major, minor or patch) and commit it as a release
+release BUMP:
+    uv version --bump {{BUMP}} --no-sync
+    git commit -m "Release $(uv version --short)" pyproject.toml
