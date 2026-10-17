@@ -93,7 +93,9 @@ def test_chat_key_reaches_client_as_bearer_token(mocker):
     client.chat.return_value = iter([_ollama_chunk("ok", done=True, usage=True)])
     client_class = mocker.patch("ollama.Client", return_value=client)
 
-    OllamaChatModel("llama2:7b").prompt("Dummy Prompt", key="caller-key").text()
+    OllamaChatModel(model_id="llama2:7b", ollama_name="llama2:7b").prompt(
+        "Dummy Prompt", key="caller-key"
+    ).text()
 
     assert_bearer_token(client_class, "caller-key")
 
@@ -110,7 +112,7 @@ async def test_async_chat_key_reaches_client_as_bearer_token(mocker):
     client_class = mocker.patch("ollama.AsyncClient", return_value=client)
 
     await (
-        AsyncOllamaChatModel("llama2:7b")
+        AsyncOllamaChatModel(model_id="llama2:7b", ollama_name="llama2:7b")
         .prompt("Dummy Prompt", key="caller-key")
         .text()
     )

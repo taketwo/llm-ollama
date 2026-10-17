@@ -308,7 +308,7 @@ The tests of each kind will be:
 
 To test with another model, pass `--<kind>-model`, for example `--chat-model qwen3:14b`.
 
-Unit tests mirror the package one to one: the tests for `llm_ollama/models/chat.py` are in `tests/unit/models/test_chat.py`. Integration tests go through `llm.get_model()` and exercise several modules at once, so they are named by the kind of model they need instead. Each integration file marks its kind once with `pytestmark` and gets the model name from the `model_name` fixture. To add a kind, add a row to `MODEL_KINDS` in `tests/conftest.py`, which generates its marker and options.
+Unit tests mirror the package one to one: the tests for `llm_ollama/models/chat.py` are in `tests/unit/models/test_chat.py`. Integration tests go through `llm.get_model()` and exercise several modules at once, so they are named by the kind of model they need instead. Each integration file marks its kind once with `pytestmark` and gets the model ID from the `model_id` fixture. To add a kind, add a row to `MODEL_KINDS` in `tests/conftest.py`, which generates its marker and options.
 
 To lint and format the code:
 

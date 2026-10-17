@@ -6,9 +6,9 @@ from llm import Attachment, get_model, schema_dsl
 pytestmark = pytest.mark.vision
 
 
-def test_attachments(model_name, box_png):
+def test_attachments(model_id, box_png):
     """Test attachment handling in conversations."""
-    model = get_model(model_name)
+    model = get_model(model_id)
 
     response = model.prompt(
         "What is written in the image?",
@@ -23,9 +23,9 @@ Task: Warn about missing images/history. Keep replies short. Images are english 
     assert json_response["text"].lower() == "shark"
 
 
-def test_conversation_attachments(model_name, box_png):
+def test_conversation_attachments(model_id, box_png):
     """Test attachment handling in conversations."""
-    model = get_model(model_name)
+    model = get_model(model_id)
 
     convo = model.conversation()
 

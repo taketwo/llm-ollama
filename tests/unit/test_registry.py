@@ -27,8 +27,10 @@ def test_registered_chat_models(mock_ollama_client):
         key=lambda m: m.model.model_id,
     )
     assert len(registered_ollama_models) == len(expected)
-    for model, (name, aliases) in zip(registered_ollama_models, expected, strict=True):
-        assert model.model.model_id == name
+    for model, (model_id, aliases) in zip(
+        registered_ollama_models, expected, strict=True
+    ):
+        assert model.model.model_id == model_id
         assert model.aliases == aliases
 
 
@@ -49,8 +51,10 @@ def test_registered_embedding_models(mock_ollama_client):
         key=lambda m: m.model.model_id,
     )
     assert len(registered_ollama_models) == len(expected)
-    for model, (name, aliases) in zip(registered_ollama_models, expected, strict=True):
-        assert model.model.model_id == name
+    for model, (model_id, aliases) in zip(
+        registered_ollama_models, expected, strict=True
+    ):
+        assert model.model.model_id == model_id
         assert model.aliases == aliases
 
 
