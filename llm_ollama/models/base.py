@@ -10,7 +10,10 @@ class BaseMixin:
     overrides.
     """
 
+    # The ID llm knows the model by
     model_id: str
+    # The name the Ollama server knows the model by
+    ollama_name: str
 
     def __str__(self) -> str:
         """Return the model's display name, prefixed with ``Ollama:``."""

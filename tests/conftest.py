@@ -121,8 +121,8 @@ def _find_served_kinds(
 
 
 @pytest.fixture
-def model_name(request: pytest.FixtureRequest) -> str:
-    """The model to test, given by the ``--<kind>-model`` option of the test's kind.
+def model_id(request: pytest.FixtureRequest) -> str:
+    """The ID of the model named by the ``--<kind>-model`` option of the test's kind.
 
     The test must carry exactly one model kind marker.
     """

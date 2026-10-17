@@ -93,12 +93,17 @@ class ChatMixin(BaseMixin):
 
     def __init__(
         self,
-        model_id: str,
         *,
+        model_id: str,
+        ollama_name: str,
         supports_tools: bool = True,
     ) -> None:
-        """Create the model; ``supports_tools`` says whether it accepts tool definitions."""
+        """Create the model llm knows as ``model_id`` and Ollama as ``ollama_name``.
+
+        ``supports_tools`` says whether the model accepts tool definitions.
+        """
         self.model_id = model_id
+        self.ollama_name = ollama_name
         self.supports_tools = supports_tools
 
     def build_messages(
@@ -162,7 +167,7 @@ class OllamaChatModel(ChatMixin, llm.KeyModel):
         client = get_client(key=key)
         if stream:
             response_stream = client.chat(
-                model=self.model_id,
+                model=self.ollama_name,
                 messages=messages,
                 stream=True,
                 options=options,
@@ -172,7 +177,7 @@ class OllamaChatModel(ChatMixin, llm.KeyModel):
                 yield from accumulator.consume(chunk)
         else:
             ollama_response = client.chat(
-                model=self.model_id,
+                model=self.ollama_name,
                 messages=messages,
                 options=options,
                 **kwargs,
@@ -214,7 +219,7 @@ class AsyncOllamaChatModel(ChatMixin, llm.AsyncKeyModel):
         client = get_async_client(key=key)
         if stream:
             response_stream = await client.chat(
-                model=self.model_id,
+                model=self.ollama_name,
                 messages=messages,
                 stream=True,
                 options=options,
@@ -225,7 +230,7 @@ class AsyncOllamaChatModel(ChatMixin, llm.AsyncKeyModel):
                     yield event
         else:
             ollama_response = await client.chat(
-                model=self.model_id,
+                model=self.ollama_name,
                 messages=messages,
                 options=options,
                 **kwargs,

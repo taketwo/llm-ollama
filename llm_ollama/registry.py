@@ -16,30 +16,37 @@ cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
 @llm.hookimpl
 def register_models(register: Callable[..., None]) -> None:
     """Register a chat model for each Ollama model that supports completion."""
-    for digest, name, aliases in _distinct_models():
+    for digest, name, alias_names in _distinct_models():
         capabilities = get_ollama_model_capabilities(digest, name)
         if "completion" not in capabilities:
             continue
         supports_tools = "tools" in capabilities
         register(
-            OllamaChatModel(name, supports_tools=supports_tools),
-            AsyncOllamaChatModel(name, supports_tools=supports_tools),
-            aliases=aliases,
+            OllamaChatModel(
+                model_id=name, ollama_name=name, supports_tools=supports_tools
+            ),
+            AsyncOllamaChatModel(
+                model_id=name, ollama_name=name, supports_tools=supports_tools
+            ),
+            aliases=alias_names,
         )
 
 
 @llm.hookimpl
 def register_embedding_models(register: Callable[..., None]) -> None:
     """Register an embedding model for each distinct Ollama model."""
-    for _, name, aliases in _distinct_models():
-        register(OllamaEmbeddingModel(name), aliases=aliases)
+    for _, name, alias_names in _distinct_models():
+        register(
+            OllamaEmbeddingModel(model_id=name, ollama_name=name),
+            aliases=alias_names,
+        )
 
 
 def _distinct_models() -> Iterator[tuple[str, str, tuple[str, ...]]]:
-    """Yield the digest, primary name and aliases of each model on the Ollama server.
+    """Yield the digest, primary name and alias names of each model on the Ollama server.
 
     Names that share a digest are one model, and a name tagged ``:latest`` also has
-    its bare form as an alias.
+    its bare form as an alias name.
     """
     names_by_digest = defaultdict(list)
     for model in get_ollama_models():
@@ -48,8 +55,8 @@ def _distinct_models() -> Iterator[tuple[str, str, tuple[str, ...]]]:
         if name.endswith(":latest"):
             names_by_digest[digest].append(name.removesuffix(":latest"))
     for digest, names in names_by_digest.items():
-        name, aliases = _pick_primary_name(names)
-        yield digest, name, aliases
+        name, alias_names = _pick_primary_name(names)
+        yield digest, name, alias_names
 
 
 def _pick_primary_name(names: list[str]) -> tuple[str, tuple[str, ...]]:
@@ -66,7 +73,7 @@ def _pick_primary_name(names: list[str]) -> tuple[str, tuple[str, ...]]:
     Returns
     -------
     tuple[str, tuple[str, ...]]
-        The primary model name and a tuple with the secondary names.
+        The primary model name and a tuple with the alias names.
 
     """
     if len(names) == 1:
@@ -95,12 +102,12 @@ def get_ollama_models() -> list[dict]:
 @cache("model_capabilities", key="digest")
 def get_ollama_model_capabilities(
     digest: str,  # noqa: ARG001
-    model: str,
+    name: str,
 ) -> list[str]:
-    """Return the capabilities the Ollama server reports for a model.
+    """Return the capabilities the Ollama server reports for the model named ``name``.
 
-    The result is cached on disk by ``digest``, so the server is asked about ``model``
-    only on a cache miss. Raises if the server cannot be reached or does not know the
-    model.
+    The result is cached on disk by ``digest``, so the server is asked about ``name``
+    only on a cache miss. Raises if the server cannot be reached or does not know
+    ``name``.
     """
-    return get_client().show(model).capabilities or []
+    return get_client().show(name).capabilities or []

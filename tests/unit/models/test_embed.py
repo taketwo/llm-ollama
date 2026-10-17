@@ -39,7 +39,9 @@ def test_model_embed(
     else:
         monkeypatch.delenv("OLLAMA_EMBED_TRUNCATE", raising=False)
 
-    result = OllamaEmbeddingModel("mxbai-embed-large:latest").embed("string to embed")
+    result = OllamaEmbeddingModel(
+        model_id="mxbai-embed-large:latest", ollama_name="mxbai-embed-large:latest"
+    ).embed("string to embed")
     assert result == expected
 
     _, called_kwargs = client.embed.call_args
@@ -52,8 +54,8 @@ def test_embed_key_reaches_client_as_bearer_token(mocker):
     client.embed.return_value = {"embeddings": [[0.1]]}
     client_class = mocker.patch("ollama.Client", return_value=client)
 
-    OllamaEmbeddingModel("mxbai-embed-large:latest").embed(
-        "string to embed", key="caller-key"
-    )
+    OllamaEmbeddingModel(
+        model_id="mxbai-embed-large:latest", ollama_name="mxbai-embed-large:latest"
+    ).embed("string to embed", key="caller-key")
 
     assert_bearer_token(client_class, "caller-key")
