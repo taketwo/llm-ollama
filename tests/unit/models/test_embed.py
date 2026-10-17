@@ -48,6 +48,21 @@ def test_model_embed(
     assert called_kwargs.get("truncate") is expected_truncate_value
 
 
+def test_embed_sends_ollama_name(mocker):
+    """The server is asked for the model by its Ollama name, not its llm ID."""
+    client = Mock()
+    client.embed.return_value = {"embeddings": [[0.1]]}
+    mocker.patch("ollama.Client", return_value=client)
+    model = OllamaEmbeddingModel(
+        model_id="ollama/mxbai-embed-large:latest",
+        ollama_name="mxbai-embed-large:latest",
+    )
+
+    model.embed("string to embed")
+
+    assert client.embed.call_args.kwargs["model"] == "mxbai-embed-large:latest"
+
+
 def test_embed_key_reaches_client_as_bearer_token(mocker):
     """A per-call key travels from embed() through to the client's auth header."""
     client = Mock()

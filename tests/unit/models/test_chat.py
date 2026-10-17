@@ -120,6 +120,37 @@ async def test_async_chat_key_reaches_client_as_bearer_token(mocker):
     assert_bearer_token(client_class, "caller-key")
 
 
+@pytest.mark.parametrize("stream", [True, False])
+def test_sync_chat_sends_ollama_name(mock_ollama_client, stream):
+    """The server is asked for the model by its Ollama name, not its llm ID."""
+    reply = _ollama_chunk("ok", done=True, usage=True)
+    if stream:
+        _install_sync_chat(mock_ollama_client, chunks=[reply])
+    else:
+        _install_sync_chat(mock_ollama_client, response=reply)
+    model = OllamaChatModel(model_id="ollama/llama2:7b", ollama_name="llama2:7b")
+
+    model.prompt("Dummy Prompt", stream=stream).text()
+
+    assert mock_ollama_client.chat.call_args.kwargs["model"] == "llama2:7b"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stream", [True, False])
+async def test_async_chat_sends_ollama_name(mocker, stream):
+    """The server is asked for the model by its Ollama name, not its llm ID."""
+    reply = _ollama_chunk("ok", done=True, usage=True)
+    if stream:
+        client = _install_async_chat(mocker, chunks=[reply])
+    else:
+        client = _install_async_chat(mocker, response=reply)
+    model = AsyncOllamaChatModel(model_id="ollama/llama2:7b", ollama_name="llama2:7b")
+
+    await model.prompt("Dummy Prompt", stream=stream).text()
+
+    assert client.chat.call_args.kwargs["model"] == "llama2:7b"
+
+
 def test_sync_streaming_yields_text(mocker, mock_ollama_client):
     """A streamed sync response yields concatenated text content."""
     _install_sync_chat(
@@ -130,7 +161,7 @@ def test_sync_streaming_yields_text(mocker, mock_ollama_client):
         ],
     )
 
-    response = get_model("llama2:7b").prompt("Dummy Prompt")
+    response = get_model("ollama/llama2:7b").prompt("Dummy Prompt")
 
     assert response.text() == "Test response 1Test response 2"
     mock_ollama_client.chat.assert_called_once()
@@ -147,7 +178,7 @@ async def test_async_streaming_yields_text(mocker, mock_ollama_client):
         ],
     )
 
-    response = get_async_model("llama2:7b").prompt("Dummy Prompt")
+    response = get_async_model("ollama/llama2:7b").prompt("Dummy Prompt")
 
     assert await response.text() == "Test response 1Test response 2"
     client.chat.assert_called_once()
@@ -163,7 +194,7 @@ def test_sync_streaming_captures_tool_calls(mocker, mock_ollama_client):
         ],
     )
 
-    response = get_model("llama2:7b").prompt("Dummy Prompt")
+    response = get_model("ollama/llama2:7b").prompt("Dummy Prompt")
     response.text()
     tool_calls = response.tool_calls()
 
@@ -182,7 +213,7 @@ async def test_async_streaming_captures_tool_calls(mocker, mock_ollama_client):
         ],
     )
 
-    response = get_async_model("llama2:7b").prompt("Dummy Prompt")
+    response = get_async_model("ollama/llama2:7b").prompt("Dummy Prompt")
     await response.text()
     tool_calls = await response.tool_calls()
 
@@ -201,7 +232,7 @@ def test_sync_non_streaming_captures_tool_calls(mocker, mock_ollama_client):
         ),
     )
 
-    response = get_model("llama2:7b").prompt("Dummy Prompt", stream=False)
+    response = get_model("ollama/llama2:7b").prompt("Dummy Prompt", stream=False)
     response.text()
     tool_calls = response.tool_calls()
 
@@ -224,7 +255,7 @@ async def test_async_non_streaming_captures_tool_calls(
         ),
     )
 
-    response = get_async_model("llama2:7b").prompt("Dummy Prompt", stream=False)
+    response = get_async_model("ollama/llama2:7b").prompt("Dummy Prompt", stream=False)
     await response.text()
     tool_calls = await response.tool_calls()
 
@@ -319,7 +350,7 @@ def test_thinking_surfaces_as_reasoning_part(mocker, mock_ollama_client):
         ],
     )
 
-    response = get_model("deepseek-r1:70b").prompt("Dummy Prompt")
+    response = get_model("ollama/deepseek-r1:70b").prompt("Dummy Prompt")
     assert response.text() == "Final answer"
 
     parts = response.messages()[-1].parts
@@ -338,7 +369,7 @@ def test_hide_reasoning_suppresses_reasoning_events(mocker, mock_ollama_client):
         ],
     )
 
-    response = get_model("deepseek-r1:70b").prompt(
+    response = get_model("ollama/deepseek-r1:70b").prompt(
         "Dummy Prompt",
         hide_reasoning=True,
         think=True,
@@ -363,7 +394,7 @@ def test_streamed_response_json_matches_non_streamed(mocker, mock_ollama_client)
             _ollama_chunk("42", done=True, usage=True),
         ],
     )
-    streamed = get_model("deepseek-r1:70b").prompt("Dummy Prompt")
+    streamed = get_model("ollama/deepseek-r1:70b").prompt("Dummy Prompt")
     streamed.text()
 
     _install_sync_chat(
@@ -376,7 +407,9 @@ def test_streamed_response_json_matches_non_streamed(mocker, mock_ollama_client)
             usage=True,
         ),
     )
-    non_streamed = get_model("deepseek-r1:70b").prompt("Dummy Prompt", stream=False)
+    non_streamed = get_model("ollama/deepseek-r1:70b").prompt(
+        "Dummy Prompt", stream=False
+    )
     non_streamed.text()
 
     assert streamed.response_json == non_streamed.response_json
@@ -399,7 +432,7 @@ async def test_async_streaming_reassembles_response_json(mocker, mock_ollama_cli
         ],
     )
 
-    response = get_async_model("llama2:7b").prompt("Dummy Prompt")
+    response = get_async_model("ollama/llama2:7b").prompt("Dummy Prompt")
     await response.text()
 
     message = response.response_json["message"]
@@ -422,7 +455,7 @@ def test_tool_call_reply_round_trip(mocker, mock_ollama_client):
         ),
     ]
 
-    first = get_model("llama2:7b").prompt("What is 6 times 7?")
+    first = get_model("ollama/llama2:7b").prompt("What is 6 times 7?")
     first.text()
     tool_calls = first.tool_calls()
     assert len(tool_calls) == 1
@@ -457,7 +490,7 @@ def test_build_messages_handles_multi_attachment_history(mock_ollama_client, box
     att_a = Attachment(content=box_png, type="image/png")
     att_b = Attachment(content=box_png + b"\x00", type="image/png")
 
-    model = get_model("llama2:7b")
+    model = get_model("ollama/llama2:7b")
     conversation = model.conversation()
 
     mock_ollama_client.chat.side_effect = [
@@ -487,7 +520,7 @@ def test_build_messages_drops_reasoning_from_history(mock_ollama_client):
         iter([_ollama_chunk("Follow-up answer", done=True, usage=True)]),
     ]
 
-    conversation = get_model("deepseek-r1:70b").conversation()
+    conversation = get_model("ollama/deepseek-r1:70b").conversation()
     first = conversation.prompt("Dummy Prompt")
     first.text()
     assert any(isinstance(p, ReasoningPart) for p in first.messages()[-1].parts)

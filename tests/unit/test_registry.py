@@ -17,10 +17,13 @@ def test_plugin_is_installed():
 
 def test_registered_chat_models(mock_ollama_client):
     expected = (
-        ("deepseek-r1:70b-llama-distill-q4_K_M", ["deepseek-r1:70b"]),
-        ("llama2:7b-q4_K_M", ["llama2:7b", "llama2:latest", "llama2"]),
-        ("phi3:latest", ["phi3"]),
-        ("stable-code:3b", []),
+        ("ollama/deepseek-r1:70b-llama-distill-q4_K_M", ["ollama/deepseek-r1:70b"]),
+        (
+            "ollama/llama2:7b-q4_K_M",
+            ["ollama/llama2:7b", "ollama/llama2:latest", "ollama/llama2"],
+        ),
+        ("ollama/phi3:latest", ["ollama/phi3"]),
+        ("ollama/stable-code:3b", []),
     )
     registered_ollama_models = sorted(
         [m for m in get_models_with_aliases() if isinstance(m.model, OllamaChatModel)],
@@ -36,11 +39,14 @@ def test_registered_chat_models(mock_ollama_client):
 
 def test_registered_embedding_models(mock_ollama_client):
     expected = (
-        ("deepseek-r1:70b-llama-distill-q4_K_M", ["deepseek-r1:70b"]),
-        ("llama2:7b-q4_K_M", ["llama2:7b", "llama2:latest", "llama2"]),
-        ("mxbai-embed-large:latest", ["mxbai-embed-large"]),
-        ("phi3:latest", ["phi3"]),
-        ("stable-code:3b", []),
+        ("ollama/deepseek-r1:70b-llama-distill-q4_K_M", ["ollama/deepseek-r1:70b"]),
+        (
+            "ollama/llama2:7b-q4_K_M",
+            ["ollama/llama2:7b", "ollama/llama2:latest", "ollama/llama2"],
+        ),
+        ("ollama/mxbai-embed-large:latest", ["ollama/mxbai-embed-large"]),
+        ("ollama/phi3:latest", ["ollama/phi3"]),
+        ("ollama/stable-code:3b", []),
     )
     registered_ollama_models = sorted(
         [
