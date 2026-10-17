@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any, ParamSpec, TypeVar
 
 import yaml
-import yaml.scanner
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -72,20 +71,22 @@ class Cache:
         -------
         dict[str, Any]
             The cached contents, or an empty cache of the current version if the file
-            is missing, unparseable, or written under a different ``CACHE_VERSION``.
+            is missing or unparseable, lacks a ``data`` mapping, or was written under a
+            different ``CACHE_VERSION``.
 
         """
-        cache: dict[str, Any] = {}
+        cache = None
         try:
             with cache_file.open("r") as f:
-                loaded_cache = yaml.safe_load(f)
-                if loaded_cache is not None:
-                    cache = loaded_cache
-        except (FileNotFoundError, yaml.scanner.ScannerError):
+                cache = yaml.safe_load(f)
+        except (FileNotFoundError, UnicodeDecodeError, yaml.YAMLError):
             pass
 
-        # Invalidate cache if version is not present or has changed
-        if "version" not in cache or cache["version"] != self.CACHE_VERSION:
+        if (
+            not isinstance(cache, dict)
+            or cache.get("version") != self.CACHE_VERSION
+            or not isinstance(cache.get("data"), dict)
+        ):
             cache = {"version": self.CACHE_VERSION, "data": {}}
         return cache
 

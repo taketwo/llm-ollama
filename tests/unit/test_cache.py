@@ -150,16 +150,21 @@ class TestCacheInvalidation:
     @pytest.mark.parametrize(
         "content",
         [
-            "",  # Empty file
-            "# Just a comment",  # Comment only
-            "invalid: yaml: content:",  # Invalid YAML
+            b"",  # Empty file
+            b"# Just a comment",  # Comment only
+            b"invalid: yaml: content:",  # Scanner error
+            b"data: [unfinished",  # Parser error
+            b"\xff",  # Not UTF-8
+            b"42",  # Scalar root
+            f"version: {Cache.CACHE_VERSION}".encode(),  # Missing data
+            f"version: {Cache.CACHE_VERSION}\ndata: test".encode(),  # Scalar data
         ],
     )
     def test_invalid_cache_file(self, cache, cache_dir, func_instrumented, content):
         """Test handling of invalid/corrupted cache files."""
 
         cache_file = cache_dir / "invalid.yaml"
-        cache_file.write_text(content)
+        cache_file.write_bytes(content)
 
         func_decorated = cache("invalid", key="value")(func_instrumented)
 
