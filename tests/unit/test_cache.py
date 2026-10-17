@@ -153,6 +153,21 @@ class TestCacheInvalidation:
             "",  # Empty file
             "# Just a comment",  # Comment only
             "invalid: yaml: content:",  # Invalid YAML
+            pytest.param("42", id="scalar-root"),
+            pytest.param("true", id="boolean-root"),
+            pytest.param("version", id="string-root"),
+            pytest.param("[version, data]", id="sequence-root"),
+            pytest.param("data: [unfinished", id="parser-error"),
+            pytest.param("data: *missing", id="composer-error"),
+            pytest.param("!!unknown {}", id="constructor-error"),
+            pytest.param(f"version: {Cache.CACHE_VERSION}", id="missing-data"),
+            pytest.param(f"version: {Cache.CACHE_VERSION}\ndata: null", id="null-data"),
+            pytest.param(
+                f"version: {Cache.CACHE_VERSION}\ndata: [test]", id="sequence-data"
+            ),
+            pytest.param(
+                f"version: {Cache.CACHE_VERSION}\ndata: test", id="scalar-data"
+            ),
         ],
     )
     def test_invalid_cache_file(self, cache, cache_dir, func_instrumented, content):
@@ -172,6 +187,36 @@ class TestCacheInvalidation:
             cache_data = yaml.safe_load(f)
         assert cache_data["version"] == Cache.CACHE_VERSION
         assert "test" in cache_data["data"]
+
+        # A second call must use the repaired cache instead of recomputing.
+        assert func_decorated("test") == result
+        assert func_instrumented.call_count == 1
+
+    def test_valid_cache_hit_preserves_file(self, cache, cache_dir, func_instrumented):
+        cache_file = cache_dir / "valid.yaml"
+        content = yaml.safe_dump(
+            {"version": Cache.CACHE_VERSION, "data": {"old": "cached-result"}}
+        )
+        cache_file.write_text(content)
+        func_decorated = cache("valid", key="value")(func_instrumented)
+
+        assert func_decorated("old") == "cached-result"
+        func_instrumented.assert_not_called()
+        assert cache_file.read_text() == content
+
+        assert func_decorated("new") == func("new")
+        func_instrumented.assert_called_once_with("new")
+        repaired = yaml.safe_load(cache_file.read_text())
+        assert repaired["data"] == {"old": "cached-result", "new": func("new")}
+
+    def test_cache_permission_error_propagates(self, cache, func_instrumented, mocker):
+        func_decorated = cache("protected", key="value")(func_instrumented)
+        mocker.patch("pathlib.Path.open", side_effect=PermissionError("cache denied"))
+
+        with pytest.raises(PermissionError, match="cache denied"):
+            func_decorated("test")
+
+        func_instrumented.assert_not_called()
 
 
 class TestSetDir:
