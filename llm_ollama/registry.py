@@ -21,14 +21,15 @@ def register_models(register: Callable[..., None]) -> None:
         if "completion" not in capabilities:
             continue
         supports_tools = "tools" in capabilities
+        model_id = _to_model_id(name)
         register(
             OllamaChatModel(
-                model_id=name, ollama_name=name, supports_tools=supports_tools
+                model_id=model_id, ollama_name=name, supports_tools=supports_tools
             ),
             AsyncOllamaChatModel(
-                model_id=name, ollama_name=name, supports_tools=supports_tools
+                model_id=model_id, ollama_name=name, supports_tools=supports_tools
             ),
-            aliases=alias_names,
+            aliases=[_to_model_id(alias_name) for alias_name in alias_names],
         )
 
 
@@ -37,9 +38,14 @@ def register_embedding_models(register: Callable[..., None]) -> None:
     """Register an embedding model for each distinct Ollama model."""
     for _, name, alias_names in _distinct_models():
         register(
-            OllamaEmbeddingModel(model_id=name, ollama_name=name),
-            aliases=alias_names,
+            OllamaEmbeddingModel(model_id=_to_model_id(name), ollama_name=name),
+            aliases=[_to_model_id(alias_name) for alias_name in alias_names],
         )
+
+
+def _to_model_id(name: str) -> str:
+    """Convert an Ollama model name to the ID or alias llm knows it by."""
+    return f"ollama/{name}"
 
 
 def _distinct_models() -> Iterator[tuple[str, str, tuple[str, ...]]]:

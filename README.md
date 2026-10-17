@@ -32,25 +32,25 @@ mxbai-embed-large:latest          468836162de7    embedding
 qwen3:4b                          2bfd38a7daaf    completion, tools, thinking
 ```
 
-Once registered, models are available for prompting, chatting, and embedding. Assuming you have `gemma3:latest` available, you can run a prompt using:
+Once registered, models are available for prompting, chatting, and embedding under their Ollama names prefixed with `ollama/`. Assuming you have `gemma3:latest` available, you can run a prompt using:
 
 ```bash
-llm -m gemma3:latest 'How much is 2+2?'
+llm -m ollama/gemma3:latest 'How much is 2+2?'
 ```
 
 The plugin automatically creates shorter aliases for models that have `:latest` in the name, so the previous command is equivalent to running:
 
 ```bash
-llm -m gemma3 'How much is 2+2?'
+llm -m ollama/gemma3 'How much is 2+2?'
 ```
 
 To start an interactive chat session instead of a one-shot prompt, run:
 
 ```bash
-llm chat -m gemma3
+llm chat -m ollama/gemma3
 ```
 ```bash
-Chatting with gemma3:latest
+Chatting with ollama/gemma3:latest
 Type 'exit' or 'quit' to exit
 Type '!multi' to enter multiple lines, then '!end' to finish
 Type '!edit' to open your default editor and modify the prompt
@@ -65,7 +65,7 @@ Type '!fragment <my_fragment> [<another_fragment> ...]' to insert one or more fr
 Multi-modal Ollama models can accept image attachments using the [LLM attachments](https://llm.datasette.io/en/stable/usage.html#attachments) option:
 
 ```bash
-llm -m llava "Describe this image" -a https://static.simonwillison.net/static/2024/pelicans.jpg
+llm -m ollama/llava "Describe this image" -a https://static.simonwillison.net/static/2024/pelicans.jpg
 ```
 
 ### Tools
@@ -73,7 +73,7 @@ llm -m llava "Describe this image" -a https://static.simonwillison.net/static/20
 Ollama models with [tools support](https://ollama.com/search?c=tools) can make use of [LLM tools](https://llm.datasette.io/en/stable/tools.html) passed to them:
 
 ```bash
-llm -m llama3.2 -T llm_time 'What is the time?' --td
+llm -m ollama/llama3.2 -T llm_time 'What is the time?' --td
 ```
 
 The plugin also registers `ollama_web_search` and `ollama_web_fetch` tools that wrap the [web search API](https://docs.ollama.com/web-search) provided by `ollama.com`. These tools augment models with the latest information to reduce hallucinations and improve accuracy. To use these tools, an API key must be configured (see [Ollama cloud](#ollama-cloud)).
@@ -83,7 +83,7 @@ The plugin also registers `ollama_web_search` and `ollama_web_fetch` tools that 
 The plugin supports [LLM embeddings](https://llm.datasette.io/en/stable/embeddings/cli.html). Both regular and specialized embedding models (such as `mxbai-embed-large`) can be used:
 
 ```bash
-llm embed -m mxbai-embed-large -i README.md
+llm embed -m ollama/mxbai-embed-large -i README.md
 ```
 
 By default, the input will be truncated from the end to fit within the context length. This behavior can be changed by setting `OLLAMA_EMBED_TRUNCATE=no` environment variable. In such cases, embedding operation will fail if the context length is exceeded.
@@ -102,7 +102,7 @@ Two knobs control reasoning behavior:
 Ollama's built-in support for [structured outputs](https://ollama.com/blog/structured-outputs) can be accessed through [LLM schemas](https://llm.datasette.io/en/stable/schemas.html), for example:
 
 ```bash
-llm -m llama3.2 --schema "name, age int, one_sentence_bio" "invent a cool dog"
+llm -m ollama/llama3.2 --schema "name, age int, one_sentence_bio" "invent a cool dog"
 ```
 
 ### Async models
@@ -116,7 +116,7 @@ import asyncio, llm
 
 
 async def run():
-    model = llm.get_async_model("llama3.2:latest")
+    model = llm.get_async_model("ollama/llama3.2:latest")
     response = model.prompt("A short poem about tea")
     print(await response.text())
 
@@ -142,7 +142,7 @@ In such cases, the plugin will register a single model and create additional ali
 llm models
 ...
 
-Ollama: stable-code:3b (aliases: stable-code:code, stable-code:latest, stable-code)
+Ollama: ollama/stable-code:3b (aliases: ollama/stable-code:code, ollama/stable-code:latest, ollama/stable-code)
 ```
 
 ## Model options
@@ -224,7 +224,7 @@ export OLLAMA_API_KEY=your-api-key
 A key can also be supplied per call with `--key`, which overrides both of the above:
 
 ```bash
-llm -m gpt-oss:120b-cloud --key your-api-key "How much is 2+2?"
+llm -m ollama/gpt-oss:120b-cloud --key your-api-key "How much is 2+2?"
 ```
 
 ## Development

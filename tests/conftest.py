@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from llm_ollama.auth import get_client
+from llm_ollama.registry import _to_model_id
 
 
 @dataclass(frozen=True)
@@ -131,7 +132,7 @@ def model_id(request: pytest.FixtureRequest) -> str:
         for candidate in MODEL_KINDS
         if request.node.get_closest_marker(candidate.name)
     ]
-    return request.config.getoption(f"--{kind.name}-model")
+    return _to_model_id(request.config.getoption(f"--{kind.name}-model"))
 
 
 @pytest.fixture
