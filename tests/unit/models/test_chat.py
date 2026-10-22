@@ -672,3 +672,23 @@ async def test_async_think_false_is_sent_with_thinking(mocker, mock_ollama_clien
     )
 
     assert client.chat.call_args.kwargs["think"] is False
+
+
+def test_model_parameters_reach_ollama_options(mock_ollama_client):
+    """Modelfile parameters travel in ``options``; plugin options are split out."""
+    _install_sync_chat(
+        mock_ollama_client,
+        response=_ollama_chunk("ok", done=True, usage=True),
+    )
+
+    get_model("ollama/llama2:7b").prompt(
+        "Dummy Prompt",
+        stream=False,
+        temperature=0.5,
+        draft_num_predict=2,
+        json_object=True,
+    ).text()
+
+    kwargs = mock_ollama_client.chat.call_args.kwargs
+    assert kwargs["options"] == {"temperature": 0.5, "draft_num_predict": 2}
+    assert kwargs["format"] == "json"
