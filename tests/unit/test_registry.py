@@ -42,17 +42,7 @@ def test_registered_chat_models(mock_ollama_client):
 
 
 def test_registered_embedding_models(mock_ollama_client):
-    expected = (
-        ("ollama/deepseek-r1:70b-llama-distill-q4_K_M", ["ollama/deepseek-r1:70b"]),
-        ("ollama/gemma4:e2b", []),
-        (
-            "ollama/llama2:7b-q4_K_M",
-            ["ollama/llama2:7b", "ollama/llama2:latest", "ollama/llama2"],
-        ),
-        ("ollama/mxbai-embed-large:latest", ["ollama/mxbai-embed-large"]),
-        ("ollama/phi3:latest", ["ollama/phi3"]),
-        ("ollama/stable-code:3b", []),
-    )
+    expected = (("ollama/mxbai-embed-large:latest", ["ollama/mxbai-embed-large"]),)
     registered_ollama_models = sorted(
         [
             m
@@ -94,19 +84,59 @@ def _registered_chat_model_ids():
     return {m.model.model_id for m in _registered_chat_models()}
 
 
+def _registered_embedding_model_ids():
+    return {
+        m.model.model_id
+        for m in get_embedding_models_with_aliases()
+        if isinstance(m.model, OllamaEmbeddingModel)
+    }
+
+
+# Per hook: a model it registers, and a function returning the IDs it registers
+_HOOKS = [
+    pytest.param("phi3:latest", _registered_chat_model_ids, id="chat"),
+    pytest.param(
+        "mxbai-embed-large:latest", _registered_embedding_model_ids, id="embedding"
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("name", "registered_model_ids", "expected"),
+    [
+        pytest.param(
+            "phi3:latest",
+            _registered_chat_model_ids,
+            {
+                "ollama/deepseek-r1:70b-llama-distill-q4_K_M",
+                "ollama/gemma4:e2b",
+                "ollama/llama2:7b-q4_K_M",
+                "ollama/stable-code:3b",
+            },
+            id="chat",
+        ),
+        pytest.param(
+            "mxbai-embed-large:latest",
+            _registered_embedding_model_ids,
+            set(),
+            id="embedding",
+        ),
+    ],
+)
 @pytest.mark.parametrize(
     "error",
-    [ollama.ResponseError("phi3 was retired", 410), ConnectionError("gone")],
+    [ollama.ResponseError("model was retired", 410), ConnectionError("gone")],
     ids=["response-error", "connection-error"],
 )
-def test_model_whose_capabilities_cannot_be_read_is_skipped(mock_ollama_client, error):
-    make_show_fail(mock_ollama_client, "phi3:latest", error)
-    assert _registered_chat_model_ids() == {
-        "ollama/deepseek-r1:70b-llama-distill-q4_K_M",
-        "ollama/gemma4:e2b",
-        "ollama/llama2:7b-q4_K_M",
-        "ollama/stable-code:3b",
-    }
+def test_model_whose_capabilities_cannot_be_read_is_skipped(
+    mock_ollama_client,
+    name,
+    registered_model_ids,
+    expected,
+    error,
+):
+    make_show_fail(mock_ollama_client, name, error)
+    assert registered_model_ids() == expected
 
 
 def test_capability_read_error_keeps_server_message_and_cause(mock_ollama_client):
@@ -119,23 +149,31 @@ def test_capability_read_error_keeps_server_message_and_cause(mock_ollama_client
     assert excinfo.value.__cause__ is error
 
 
+@pytest.mark.parametrize(("name", "registered_model_ids"), _HOOKS)
 def test_model_with_cached_capabilities_is_registered_when_show_fails(
     mock_ollama_client,
+    name,
+    registered_model_ids,
 ):
-    assert "ollama/phi3:latest" in _registered_chat_model_ids()
+    assert f"ollama/{name}" in registered_model_ids()
     make_show_fail(
-        mock_ollama_client, "phi3:latest", ollama.ResponseError("phi3 was retired", 410)
+        mock_ollama_client, name, ollama.ResponseError("model was retired", 410)
     )
-    assert "ollama/phi3:latest" in _registered_chat_model_ids()
+    assert f"ollama/{name}" in registered_model_ids()
 
 
-def test_failed_capabilities_read_is_not_cached(mock_ollama_client):
+@pytest.mark.parametrize(("name", "registered_model_ids"), _HOOKS)
+def test_failed_capabilities_read_is_not_cached(
+    mock_ollama_client,
+    name,
+    registered_model_ids,
+):
     show = make_show_fail(
-        mock_ollama_client, "phi3:latest", ollama.ResponseError("phi3 was retired", 410)
+        mock_ollama_client, name, ollama.ResponseError("model was retired", 410)
     )
-    assert "ollama/phi3:latest" not in _registered_chat_model_ids()
+    assert f"ollama/{name}" not in registered_model_ids()
     mock_ollama_client.show.side_effect = show
-    assert "ollama/phi3:latest" in _registered_chat_model_ids()
+    assert f"ollama/{name}" in registered_model_ids()
 
 
 def test_registered_models_support_tools_as_reported(mock_ollama_client):

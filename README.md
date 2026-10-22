@@ -81,7 +81,7 @@ The plugin also registers `ollama_web_search` and `ollama_web_fetch` tools that 
 
 ### Embeddings
 
-The plugin supports [LLM embeddings](https://llm.datasette.io/en/stable/embeddings/cli.html). Both regular and specialized embedding models (such as `mxbai-embed-large`) can be used:
+The plugin supports [LLM embeddings](https://llm.datasette.io/en/stable/embeddings/cli.html) with models that report the `embedding` capability, such as `mxbai-embed-large`:
 
 ```bash
 llm embed -m ollama/mxbai-embed-large -i README.md
