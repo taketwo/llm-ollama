@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock, Mock
 
 import llm
 import ollama
+import pydantic
 import pytest
 from helpers import assert_bearer_token
 from llm import Attachment, ToolResult, get_async_model, get_model
@@ -542,3 +543,132 @@ def test_build_messages_drops_reasoning_from_history(mock_ollama_client):
         {"role": "assistant", "content": "Final answer"},
         {"role": "user", "content": "Follow-up prompt"},
     ]
+
+
+@pytest.mark.parametrize(
+    ("model_id", "offers_think"),
+    [
+        ("ollama/deepseek-r1:70b", True),
+        ("ollama/gemma4:e2b", True),
+        ("ollama/llama2:7b", False),
+    ],
+)
+def test_think_option_is_offered_only_by_thinking_models(
+    mock_ollama_client,
+    model_id,
+    offers_think,
+):
+    """The option schema lists ``think`` only for models that report thinking."""
+    for model in (get_model(model_id), get_async_model(model_id)):
+        properties = model.Options.model_json_schema()["properties"]
+
+        assert ("think" in properties) is offers_think
+
+
+def test_sync_think_true_is_rejected_without_thinking(mock_ollama_client):
+    """Asking a model without thinking to think fails before any request."""
+    model = get_model("ollama/llama2:7b")
+
+    with pytest.raises(
+        pydantic.ValidationError,
+        match="this model does not support thinking",
+    ):
+        model.prompt("Dummy Prompt", think=True)
+
+    mock_ollama_client.chat.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_async_think_true_is_rejected_without_thinking(
+    mocker,
+    mock_ollama_client,
+):
+    """Asking a model without thinking to think fails before any request."""
+    client = _install_async_chat(mocker, response=_ollama_chunk("ok", done=True))
+    model = get_async_model("ollama/llama2:7b")
+
+    with pytest.raises(
+        pydantic.ValidationError,
+        match="this model does not support thinking",
+    ):
+        model.prompt("Dummy Prompt", think=True)
+
+    client.chat.assert_not_called()
+
+
+@pytest.mark.parametrize("think", [False, "false"])
+def test_sync_think_false_is_not_sent_without_thinking(mock_ollama_client, think):
+    """Turning thinking off on a model without it is accepted and not sent."""
+    _install_sync_chat(
+        mock_ollama_client,
+        response=_ollama_chunk("ok", done=True, usage=True),
+    )
+
+    get_model("ollama/llama2:7b").prompt(
+        "Dummy Prompt", stream=False, think=think
+    ).text()
+
+    assert "think" not in mock_ollama_client.chat.call_args.kwargs
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("think", [False, "false"])
+async def test_async_think_false_is_not_sent_without_thinking(
+    mocker,
+    mock_ollama_client,
+    think,
+):
+    """Turning thinking off on a model without it is accepted and not sent."""
+    client = _install_async_chat(
+        mocker,
+        response=_ollama_chunk("ok", done=True, usage=True),
+    )
+
+    await (
+        get_async_model("ollama/llama2:7b")
+        .prompt(
+            "Dummy Prompt",
+            stream=False,
+            think=think,
+        )
+        .text()
+    )
+
+    assert "think" not in client.chat.call_args.kwargs
+
+
+def test_sync_think_false_is_sent_with_thinking(mock_ollama_client):
+    """Turning thinking off on a thinking model reaches the server."""
+    _install_sync_chat(
+        mock_ollama_client,
+        response=_ollama_chunk("ok", done=True, usage=True),
+    )
+
+    get_model("ollama/deepseek-r1:70b").prompt(
+        "Dummy Prompt",
+        stream=False,
+        think=False,
+    ).text()
+
+    assert mock_ollama_client.chat.call_args.kwargs["think"] is False
+
+
+@pytest.mark.asyncio
+async def test_async_think_false_is_sent_with_thinking(mocker, mock_ollama_client):
+    """Turning thinking off on a thinking model reaches the server."""
+    client = _install_async_chat(
+        mocker,
+        response=_ollama_chunk("ok", done=True, usage=True),
+    )
+
+    await (
+        get_async_model("ollama/deepseek-r1:70b")
+        .prompt(
+            "Dummy Prompt",
+            stream=False,
+            think=False,
+        )
+        .text()
+    )
+
+    assert client.chat.call_args.kwargs["think"] is False
