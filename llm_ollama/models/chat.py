@@ -2,7 +2,7 @@
 
 import json
 from collections.abc import AsyncGenerator, Collection, Iterator
-from typing import ClassVar, cast
+from typing import Annotated, ClassVar, cast
 
 import llm
 import ollama
@@ -17,10 +17,86 @@ from llm.parts import (
 )
 from llm.utils import monotonic_ulid
 from ollama._utils import convert_function_to_tool
-from pydantic import Field
+from pydantic import AfterValidator, Field
+from pydantic.json_schema import SkipJsonSchema
 
 from llm_ollama.auth import get_async_client, get_client
 from llm_ollama.models.base import BaseMixin
+
+
+def _reject_thinking(think: bool | None) -> None:  # noqa: FBT001
+    """Reject a truthy ``think`` with ``ValueError``; any other value becomes ``None``."""
+    if think:
+        message = "this model does not support thinking"
+        raise ValueError(message)
+
+
+class _ChatOptions(llm.Options):
+    """Parameters that can be set when the model is run by Ollama.
+
+    See: https://github.com/ollama/ollama/blob/main/docs/modelfile.md#parameter
+    """
+
+    num_ctx: int | None = Field(
+        default=None,
+        description="Sets the size of the context window used to generate the next token. (Default: 2048)",
+    )
+    repeat_last_n: int | None = Field(
+        default=None,
+        description="Sets how far back for the model to look back to prevent repetition. (Default: 64, 0 = disabled, -1 = num_ctx)",
+    )
+    repeat_penalty: float | None = Field(
+        default=None,
+        description="Sets how strongly to penalize repetitions. A higher value (e.g., 1.5) will penalize repetitions more strongly, while a lower value (e.g., 0.9) will be more lenient. (Default: 1.1)",
+    )
+    temperature: float | None = Field(
+        default=None,
+        description="The temperature of the model. Increasing the temperature will make the model answer more creatively. (Default: 0.8)",
+    )
+    seed: int | None = Field(
+        default=None,
+        description="Sets the random number seed to use for generation. Setting this to a specific number will make the model generate the same text for the same prompt. (Default: 0)",
+    )
+    stop: list[str] | None = Field(
+        default=None,
+        description="Sets the stop sequences to use. When this pattern is encountered the LLM will stop generating text and return.",
+    )
+    num_predict: int | None = Field(
+        default=None,
+        description="Maximum number of tokens to predict when generating text. (Default: -1, infinite generation)",
+    )
+    top_k: int | None = Field(
+        default=None,
+        description="Reduces the probability of generating nonsense. A higher value (e.g. 100) will give more diverse answers, while a lower value (e.g. 10) will be more conservative. (Default: 40)",
+    )
+    top_p: float | None = Field(
+        default=None,
+        description="Works together with top-k. A higher value (e.g., 0.95) will lead to more diverse text, while a lower value (e.g., 0.5) will generate more focused and conservative text. (Default: 0.9)",
+    )
+    min_p: float | None = Field(
+        default=None,
+        description="Alternative to the top_p, and aims to ensure a balance of quality and variety. The parameter p represents the minimum probability for a token to be considered, relative to the probability of the most likely token. (Default: 0.0)",
+    )
+    json_object: bool | None = Field(
+        default=None,
+        description="Output a valid JSON object {...}. Prompt must mention JSON.",
+    )
+    # Hidden from the schema, so only thinking models offer `think`. The field stays
+    # so that a stored `think false` (a script, a default option, a template, a
+    # logged conversation) still validates, and `think true` fails with a clear
+    # message instead of pydantic's "Extra inputs are not permitted".
+    think: SkipJsonSchema[Annotated[bool | None, AfterValidator(_reject_thinking)]] = (
+        None
+    )
+
+
+class _ThinkingChatOptions(_ChatOptions):
+    """Chat options of a model that supports thinking."""
+
+    think: bool | None = Field(
+        default=None,
+        description="Enable the model's thinking process.",
+    )
 
 
 class ChatMixin(BaseMixin):
@@ -34,61 +110,9 @@ class ChatMixin(BaseMixin):
         "image/webp",
         "image/gif",
     }
-
-    class Options(llm.Options):
-        """Parameters that can be set when the model is run by Ollama.
-
-        See: https://github.com/ollama/ollama/blob/main/docs/modelfile.md#parameter
-        """
-
-        num_ctx: int | None = Field(
-            default=None,
-            description="Sets the size of the context window used to generate the next token. (Default: 2048)",
-        )
-        repeat_last_n: int | None = Field(
-            default=None,
-            description="Sets how far back for the model to look back to prevent repetition. (Default: 64, 0 = disabled, -1 = num_ctx)",
-        )
-        repeat_penalty: float | None = Field(
-            default=None,
-            description="Sets how strongly to penalize repetitions. A higher value (e.g., 1.5) will penalize repetitions more strongly, while a lower value (e.g., 0.9) will be more lenient. (Default: 1.1)",
-        )
-        temperature: float | None = Field(
-            default=None,
-            description="The temperature of the model. Increasing the temperature will make the model answer more creatively. (Default: 0.8)",
-        )
-        seed: int | None = Field(
-            default=None,
-            description="Sets the random number seed to use for generation. Setting this to a specific number will make the model generate the same text for the same prompt. (Default: 0)",
-        )
-        stop: list[str] | None = Field(
-            default=None,
-            description="Sets the stop sequences to use. When this pattern is encountered the LLM will stop generating text and return.",
-        )
-        num_predict: int | None = Field(
-            default=None,
-            description="Maximum number of tokens to predict when generating text. (Default: -1, infinite generation)",
-        )
-        top_k: int | None = Field(
-            default=None,
-            description="Reduces the probability of generating nonsense. A higher value (e.g. 100) will give more diverse answers, while a lower value (e.g. 10) will be more conservative. (Default: 40)",
-        )
-        top_p: float | None = Field(
-            default=None,
-            description="Works together with top-k. A higher value (e.g., 0.95) will lead to more diverse text, while a lower value (e.g., 0.5) will generate more focused and conservative text. (Default: 0.9)",
-        )
-        min_p: float | None = Field(
-            default=None,
-            description="Alternative to the top_p, and aims to ensure a balance of quality and variety. The parameter p represents the minimum probability for a token to be considered, relative to the probability of the most likely token. (Default: 0.0)",
-        )
-        json_object: bool | None = Field(
-            default=None,
-            description="Output a valid JSON object {...}. Prompt must mention JSON.",
-        )
-        think: bool | None = Field(
-            default=None,
-            description="Enable the model's thinking process.",
-        )
+    # A declared type rather than a nested class, so __init__ can assign the thinking
+    # variant per instance
+    Options: type[_ChatOptions] = _ChatOptions
 
     def __init__(
         self,
@@ -105,6 +129,8 @@ class ChatMixin(BaseMixin):
         self.model_id = model_id
         self.ollama_name = ollama_name
         self.supports_tools = "tools" in capabilities
+        if "thinking" in capabilities:
+            self.Options = _ThinkingChatOptions
 
     def build_messages(
         self,
