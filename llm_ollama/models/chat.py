@@ -24,6 +24,7 @@ from llm_ollama.auth import get_async_client, get_client
 from llm_ollama.models.base import BaseMixin
 
 _IMAGE_TYPES = frozenset({"image/png", "image/jpeg", "image/webp", "image/gif"})
+_AUDIO_TYPES = frozenset({"audio/wav", "audio/mpeg"})
 
 
 def _reject_thinking(think: bool | None) -> None:  # noqa: FBT001
@@ -129,9 +130,11 @@ class ChatMixin(BaseMixin):
         self.model_id = model_id
         self.ollama_name = ollama_name
         self.supports_tools = "tools" in capabilities
-        self.attachment_types = (
-            _IMAGE_TYPES if "vision" in capabilities else frozenset()
-        )
+        self.attachment_types = frozenset()
+        if "vision" in capabilities:
+            self.attachment_types |= _IMAGE_TYPES
+        if "audio" in capabilities:
+            self.attachment_types |= _AUDIO_TYPES
         if "thinking" in capabilities:
             self.Options = _ThinkingChatOptions
 
@@ -357,17 +360,17 @@ def _convert_message(message: Message) -> list[dict]:
     """Convert one ``llm`` message into the Ollama chat messages it stands for.
 
     Returns the message's tool results as standalone ``"tool"`` messages, followed by
-    the message itself unless it has no text, images or tool calls.
+    the message itself unless it has no text, media or tool calls.
     """
     text_chunks: list[str] = []
-    images: list[str] = []
+    media: list[str] = []
     tool_calls: list[ollama.Message.ToolCall] = []
     tool_results: list[ToolResultPart] = []
     for part in message.parts:
         if isinstance(part, TextPart):
             text_chunks.append(part.text)
         elif isinstance(part, AttachmentPart) and part.attachment is not None:
-            images.append(part.attachment.base64_content())
+            media.append(part.attachment.base64_content())
         elif isinstance(part, ToolCallPart):
             tool_calls.append(
                 ollama.Message.ToolCall(
@@ -396,12 +399,14 @@ def _convert_message(message: Message) -> list[dict]:
         for tool_result in tool_results
     ]
 
-    if not text_chunks and not images and not tool_calls:
+    if not text_chunks and not media and not tool_calls:
         return wire_messages
 
     wire: dict = {"role": message.role, "content": "".join(text_chunks)}
-    if images:
-        wire["images"] = images
+    if media:
+        # Ollama has no audio field: it finds WAV and MP3 among the images by their
+        # headers and passes them to the model as audio
+        wire["images"] = media
     if tool_calls:
         wire["tool_calls"] = tool_calls
     wire_messages.append(wire)

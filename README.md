@@ -60,12 +60,13 @@ Type '!fragment <my_fragment> [<another_fragment> ...]' to insert one or more fr
 
 ## Features
 
-### Image attachments
+### Attachments
 
-Multi-modal Ollama models can accept image attachments using the [LLM attachments](https://llm.datasette.io/en/stable/usage.html#attachments) option:
+Models that report the `vision` capability accept images, and models that report `audio` accept WAV and MP3 audio, using the [LLM attachments](https://llm.datasette.io/en/stable/usage.html#attachments) option:
 
 ```bash
 llm -m ollama/llava "Describe this image" -a https://static.simonwillison.net/static/2024/pelicans.jpg
+llm -m ollama/gemma4:e2b "Transcribe this recording" -a recording.mp3
 ```
 
 ### Tools
