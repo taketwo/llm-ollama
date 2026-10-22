@@ -298,13 +298,13 @@ Unit tests live in `tests/unit` and mock the Ollama server. Integration tests li
 
 | Kind     | Default model   | Model must support          |
 |----------|-----------------|-----------------------------|
-| `chat`   | `qwen3:8b`      | completion, tools, thinking |
-| `vision` | `gemma3:latest` | completion, vision          |
+| `chat`   | `gemma4:e2b`    | completion, tools, thinking |
+| `vision` | `gemma4:e2b`    | completion, vision          |
 
 The tests of each kind will be:
-- Enabled automatically if the Ollama server has the model;
-- Skipped if the server is unavailable or does not have the model;
-- Force-enabled with `--<kind>` (but fail if the server or the model is unavailable);
+- Enabled automatically if the Ollama server has the model and the model reports the capabilities it must support;
+- Skipped, with the reason, otherwise;
+- Force-enabled with `--<kind>` (but fail if they cannot be enabled);
 - Force-disabled with `--no-<kind>`.
 
 To test with another model, pass `--<kind>-model`, for example `--chat-model qwen3:14b`.

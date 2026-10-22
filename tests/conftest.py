@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+import ollama
 import pytest
 
 from llm_ollama.auth import get_client
@@ -21,8 +22,8 @@ class ModelKind:
 
 
 MODEL_KINDS = (
-    ModelKind("chat", "qwen3:8b", ("completion", "tools", "thinking")),
-    ModelKind("vision", "gemma3:latest", ("completion", "vision")),
+    ModelKind("chat", "gemma4:e2b", ("completion", "tools", "thinking")),
+    ModelKind("vision", "gemma4:e2b", ("completion", "vision")),
 )
 
 
@@ -66,12 +67,12 @@ def pytest_collection_modifyitems(
     config: pytest.Config,
     items: list[pytest.Item],
 ) -> None:
-    """Skip the tests of each model kind that is not enabled.
+    """Skip the tests of each model kind that is not enabled, with the reason.
 
-    A kind is enabled when the Ollama server has its model, unless ``--no-<kind>`` is
-    given. With ``--<kind>``, the run stops if the server cannot be queried or lacks the
-    model. Kinds without selected tests are not checked, so a run without integration
-    tests does not contact the server.
+    A kind is enabled when the Ollama server has its model and the model reports the
+    kind's capabilities, unless ``--no-<kind>`` is given. With ``--<kind>``, the run
+    stops if the kind cannot be enabled. Kinds without selected tests are not checked,
+    so a run without integration tests does not contact the server.
     """
     tests_by_kind = {
         kind: [item for item in items if item.get_closest_marker(kind.name)]
@@ -82,43 +83,63 @@ def pytest_collection_modifyitems(
         for kind, tests in tests_by_kind.items()
         if tests and not config.getoption(f"--no-{kind.name}")
     ]
-    enabled = _find_served_kinds(config, kinds_to_check) if kinds_to_check else set()
+    reasons = _find_unserved_kinds(config, kinds_to_check) if kinds_to_check else {}
     for kind, tests in tests_by_kind.items():
-        if kind in enabled:
+        if config.getoption(f"--no-{kind.name}"):
+            reason = f"--no-{kind.name} given"
+        elif kind in reasons:
+            reason = reasons[kind]
+            if config.getoption(f"--{kind.name}"):
+                pytest.exit(f"--{kind.name} given but {reason}", 1)
+        else:
             continue
-        skip = pytest.mark.skip(reason=f"{kind.name} tests disabled")
+        skip = pytest.mark.skip(reason=f"{kind.name} tests disabled: {reason}")
         for test in tests:
             test.add_marker(skip)
 
 
-def _find_served_kinds(
+def _find_unserved_kinds(
     config: pytest.Config,
     kinds: list[ModelKind],
-) -> set[ModelKind]:
-    """Return those of ``kinds`` whose model the Ollama server has.
-
-    Stops the run if a kind given as ``--<kind>`` is not among them.
-    """
+) -> dict[ModelKind, str]:
+    """Map each of ``kinds`` that the Ollama server cannot serve to the reason."""
     try:
-        server_names = {model["model"] for model in get_client().list()["models"]}
+        client = get_client()
+        server_names = {model["model"] for model in client.list()["models"]}
     except Exception as error:  # noqa: BLE001
-        for kind in kinds:
-            if config.getoption(f"--{kind.name}"):
-                pytest.exit(
-                    f"--{kind.name} given but Ollama discovery failed: {error}", 1
-                )
-        return set()
-    served_kinds = set()
-    for kind in kinds:
-        model_name = config.getoption(f"--{kind.name}-model")
+        return dict.fromkeys(kinds, f"Ollama discovery failed: {error}")
+    model_names = {kind: config.getoption(f"--{kind.name}-model") for kind in kinds}
+    capabilities_by_model: dict[str, list[str]] = {}
+    reasons_by_model: dict[str, str] = {}
+    for model_name in set(model_names.values()):
         # The plugin also registers a model tagged :latest under its bare name
-        if model_name in server_names or f"{model_name}:latest" in server_names:
-            served_kinds.add(kind)
-        elif config.getoption(f"--{kind.name}"):
-            pytest.exit(
-                f"--{kind.name} given but model {model_name} is not available", 1
+        if (
+            model_name not in server_names
+            and f"{model_name}:latest" not in server_names
+        ):
+            reasons_by_model[model_name] = f"{model_name} is not available"
+            continue
+        # Asks the server rather than the plugin's capability cache, so that a stale
+        # cache fails the tests instead of skipping them
+        try:
+            capabilities_by_model[model_name] = (
+                client.show(model_name).capabilities or []
             )
-    return served_kinds
+        except (ollama.ResponseError, ConnectionError) as error:
+            reasons_by_model[model_name] = f"{model_name} is not available: {error}"
+    reasons = {}
+    for kind, model_name in model_names.items():
+        if model_name in reasons_by_model:
+            reasons[kind] = reasons_by_model[model_name]
+            continue
+        missing = [
+            capability
+            for capability in kind.capabilities
+            if capability not in capabilities_by_model[model_name]
+        ]
+        if missing:
+            reasons[kind] = f"{model_name} does not report {', '.join(missing)}"
+    return reasons
 
 
 @pytest.fixture
