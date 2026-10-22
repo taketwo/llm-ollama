@@ -4,6 +4,7 @@ from collections import defaultdict
 from collections.abc import Callable, Iterator
 
 import llm
+import ollama
 
 from llm_ollama.auth import get_client
 from llm_ollama.cache import Cache
@@ -13,11 +14,21 @@ from llm_ollama.models.embed import OllamaEmbeddingModel
 cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
 
 
+class CapabilityReadError(Exception):
+    """The Ollama server could not report a model's capabilities."""
+
+
 @llm.hookimpl
 def register_models(register: Callable[..., None]) -> None:
-    """Register a chat model for each Ollama model that supports completion."""
+    """Register a chat model for each Ollama model that supports completion.
+
+    Models whose capabilities cannot be read are left out.
+    """
     for digest, name, alias_names in _distinct_models():
-        capabilities = get_ollama_model_capabilities(digest, name)
+        try:
+            capabilities = get_ollama_model_capabilities(digest, name)
+        except CapabilityReadError:
+            continue
         if "completion" not in capabilities:
             continue
         supports_tools = "tools" in capabilities
@@ -113,7 +124,16 @@ def get_ollama_model_capabilities(
     """Return the capabilities the Ollama server reports for the model named ``name``.
 
     The result is cached on disk by ``digest``, so the server is asked about ``name``
-    only on a cache miss. Raises if the server cannot be reached or does not know
-    ``name``.
+    only on a cache miss. A failure is not cached.
+
+    Raises
+    ------
+    CapabilityReadError
+        If the server answers with an error status, for example for a retired model,
+        or cannot be reached.
+
     """
-    return get_client().show(name).capabilities or []
+    try:
+        return get_client().show(name).capabilities or []
+    except (ollama.ResponseError, ConnectionError) as e:
+        raise CapabilityReadError(str(e)) from e
