@@ -34,12 +34,12 @@ def _reject_thinking(think: bool | None) -> None:  # noqa: FBT001
 class _ChatOptions(llm.Options):
     """Parameters that can be set when the model is run by Ollama.
 
-    See: https://github.com/ollama/ollama/blob/main/docs/modelfile.md#parameter
+    See: https://github.com/ollama/ollama/blob/main/docs/modelfile.mdx#parameter
     """
 
     num_ctx: int | None = Field(
         default=None,
-        description="Sets the size of the context window used to generate the next token. (Default: 2048)",
+        description="Sets the size of the context window used to generate the next token. (Default: OLLAMA_CONTEXT_LENGTH on the server, otherwise 4k, 32k or 256k depending on VRAM)",
     )
     repeat_last_n: int | None = Field(
         default=None,
@@ -47,7 +47,7 @@ class _ChatOptions(llm.Options):
     )
     repeat_penalty: float | None = Field(
         default=None,
-        description="Sets how strongly to penalize repetitions. A higher value (e.g., 1.5) will penalize repetitions more strongly, while a lower value (e.g., 0.9) will be more lenient. (Default: 1.1)",
+        description="Sets how strongly to penalize repetitions. A higher value (e.g., 1.5) will penalize repetitions more strongly, while a lower value (e.g., 0.9) will be more lenient. (Default: 1.0, disabled)",
     )
     temperature: float | None = Field(
         default=None,
@@ -55,7 +55,7 @@ class _ChatOptions(llm.Options):
     )
     seed: int | None = Field(
         default=None,
-        description="Sets the random number seed to use for generation. Setting this to a specific number will make the model generate the same text for the same prompt. (Default: 0)",
+        description="Sets the random number seed to use for generation. Setting this to a specific number will make the model generate the same text for the same prompt. (Default: -1, random)",
     )
     stop: list[str] | None = Field(
         default=None,
@@ -64,6 +64,10 @@ class _ChatOptions(llm.Options):
     num_predict: int | None = Field(
         default=None,
         description="Maximum number of tokens to predict when generating text. (Default: -1, infinite generation)",
+    )
+    draft_num_predict: int | None = Field(
+        default=None,
+        description="Maximum number of speculative draft tokens to predict per step when a draft model is available. Separate draft models default to 4; embedded MTP tensors require setting this parameter. Set to 0 to disable speculative drafting.",
     )
     top_k: int | None = Field(
         default=None,
