@@ -2,7 +2,7 @@
 
 import json
 from collections.abc import AsyncGenerator, Collection, Iterator
-from typing import Annotated, ClassVar, cast
+from typing import Annotated, cast
 
 import llm
 import ollama
@@ -22,6 +22,8 @@ from pydantic.json_schema import SkipJsonSchema
 
 from llm_ollama.auth import get_async_client, get_client
 from llm_ollama.models.base import BaseMixin
+
+_IMAGE_TYPES = frozenset({"image/png", "image/jpeg", "image/webp", "image/gif"})
 
 
 def _reject_thinking(think: bool | None) -> None:  # noqa: FBT001
@@ -108,12 +110,6 @@ class ChatMixin(BaseMixin):
 
     can_stream: bool = True
     supports_schema: bool = True
-    attachment_types: ClassVar[set[str]] = {
-        "image/png",
-        "image/jpeg",
-        "image/webp",
-        "image/gif",
-    }
     # A declared type rather than a nested class, so __init__ can assign the thinking
     # variant per instance
     Options: type[_ChatOptions] = _ChatOptions
@@ -133,6 +129,9 @@ class ChatMixin(BaseMixin):
         self.model_id = model_id
         self.ollama_name = ollama_name
         self.supports_tools = "tools" in capabilities
+        self.attachment_types = (
+            _IMAGE_TYPES if "vision" in capabilities else frozenset()
+        )
         if "thinking" in capabilities:
             self.Options = _ThinkingChatOptions
 

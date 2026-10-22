@@ -497,11 +497,11 @@ def test_tool_call_reply_round_trip(mocker, mock_ollama_client):
 
 
 def test_build_messages_handles_multi_attachment_history(mock_ollama_client, box_png):
-    """A conversation with attachments across turns survives the new Part chain."""
+    """Each turn's image stays with that turn's message in later requests."""
     att_a = Attachment(content=box_png, type="image/png")
     att_b = Attachment(content=box_png + b"\x00", type="image/png")
 
-    model = get_model("ollama/llama2:7b")
+    model = get_model("ollama/gemma4:e2b")
     conversation = model.conversation()
 
     mock_ollama_client.chat.side_effect = [
@@ -517,6 +517,62 @@ def test_build_messages_handles_multi_attachment_history(mock_ollama_client, box
     assert len(user_messages) == 2
     assert user_messages[0]["images"] == [att_a.base64_content()]
     assert user_messages[1]["images"] == [att_b.base64_content()]
+
+
+@pytest.mark.parametrize("model_class", [OllamaChatModel, AsyncOllamaChatModel])
+@pytest.mark.parametrize(
+    ("capabilities", "attachment_types"),
+    [
+        (["completion"], set()),
+        (
+            ["completion", "vision"],
+            {"image/png", "image/jpeg", "image/webp", "image/gif"},
+        ),
+    ],
+)
+def test_attachment_types_follow_capabilities(
+    model_class,
+    capabilities,
+    attachment_types,
+):
+    """Only models that report vision accept images."""
+    model = model_class(
+        model_id="dummy", ollama_name="dummy", capabilities=capabilities
+    )
+
+    assert model.attachment_types == attachment_types
+
+
+def test_sync_image_is_rejected_without_vision(mock_ollama_client, box_png):
+    """Sending an image to a model without vision fails before any request."""
+    model = get_model("ollama/llama2:7b")
+
+    with pytest.raises(ValueError, match="This model does not support attachments"):
+        model.prompt(
+            "Dummy Prompt",
+            attachments=[Attachment(content=box_png, type="image/png")],
+        )
+
+    mock_ollama_client.chat.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_async_image_is_rejected_without_vision(
+    mocker,
+    mock_ollama_client,
+    box_png,
+):
+    """Sending an image to a model without vision fails before any request."""
+    client = _install_async_chat(mocker, response=_ollama_chunk("ok", done=True))
+    model = get_async_model("ollama/llama2:7b")
+
+    with pytest.raises(ValueError, match="This model does not support attachments"):
+        model.prompt(
+            "Dummy Prompt",
+            attachments=[Attachment(content=box_png, type="image/png")],
+        )
+
+    client.chat.assert_not_called()
 
 
 def test_build_messages_drops_reasoning_from_history(mock_ollama_client):
