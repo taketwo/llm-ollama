@@ -82,6 +82,12 @@ def mock_ollama_client(mocker):
                 "model_info": {},
                 "capabilities": ["completion", "thinking"],
             },
+            {
+                "model": "gemma4:e2b",
+                "digest": "b37049369adfe3d2b653af0ab301a062ca5cbe96ace6aa0d3f2559ee9b563fc2",
+                "model_info": {},
+                "capabilities": ["completion", "vision", "audio", "tools", "thinking"],
+            },
         ],
     }
     client = mocker.patch("ollama.Client").return_value

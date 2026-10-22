@@ -93,9 +93,9 @@ def test_chat_key_reaches_client_as_bearer_token(mocker):
     client.chat.return_value = iter([_ollama_chunk("ok", done=True, usage=True)])
     client_class = mocker.patch("ollama.Client", return_value=client)
 
-    OllamaChatModel(model_id="llama2:7b", ollama_name="llama2:7b").prompt(
-        "Dummy Prompt", key="caller-key"
-    ).text()
+    OllamaChatModel(
+        model_id="llama2:7b", ollama_name="llama2:7b", capabilities=["completion"]
+    ).prompt("Dummy Prompt", key="caller-key").text()
 
     assert_bearer_token(client_class, "caller-key")
 
@@ -112,7 +112,9 @@ async def test_async_chat_key_reaches_client_as_bearer_token(mocker):
     client_class = mocker.patch("ollama.AsyncClient", return_value=client)
 
     await (
-        AsyncOllamaChatModel(model_id="llama2:7b", ollama_name="llama2:7b")
+        AsyncOllamaChatModel(
+            model_id="llama2:7b", ollama_name="llama2:7b", capabilities=["completion"]
+        )
         .prompt("Dummy Prompt", key="caller-key")
         .text()
     )
@@ -128,7 +130,11 @@ def test_sync_chat_sends_ollama_name(mock_ollama_client, stream):
         _install_sync_chat(mock_ollama_client, chunks=[reply])
     else:
         _install_sync_chat(mock_ollama_client, response=reply)
-    model = OllamaChatModel(model_id="ollama/llama2:7b", ollama_name="llama2:7b")
+    model = OllamaChatModel(
+        model_id="ollama/llama2:7b",
+        ollama_name="llama2:7b",
+        capabilities=["completion"],
+    )
 
     model.prompt("Dummy Prompt", stream=stream).text()
 
@@ -144,7 +150,11 @@ async def test_async_chat_sends_ollama_name(mocker, stream):
         client = _install_async_chat(mocker, chunks=[reply])
     else:
         client = _install_async_chat(mocker, response=reply)
-    model = AsyncOllamaChatModel(model_id="ollama/llama2:7b", ollama_name="llama2:7b")
+    model = AsyncOllamaChatModel(
+        model_id="ollama/llama2:7b",
+        ollama_name="llama2:7b",
+        capabilities=["completion"],
+    )
 
     await model.prompt("Dummy Prompt", stream=stream).text()
 

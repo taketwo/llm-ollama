@@ -21,6 +21,7 @@ def test_plugin_is_installed():
 def test_registered_chat_models(mock_ollama_client):
     expected = (
         ("ollama/deepseek-r1:70b-llama-distill-q4_K_M", ["ollama/deepseek-r1:70b"]),
+        ("ollama/gemma4:e2b", []),
         (
             "ollama/llama2:7b-q4_K_M",
             ["ollama/llama2:7b", "ollama/llama2:latest", "ollama/llama2"],
@@ -43,6 +44,7 @@ def test_registered_chat_models(mock_ollama_client):
 def test_registered_embedding_models(mock_ollama_client):
     expected = (
         ("ollama/deepseek-r1:70b-llama-distill-q4_K_M", ["ollama/deepseek-r1:70b"]),
+        ("ollama/gemma4:e2b", []),
         (
             "ollama/llama2:7b-q4_K_M",
             ["ollama/llama2:7b", "ollama/llama2:latest", "ollama/llama2"],
@@ -82,12 +84,14 @@ def test_interrupt_during_discovery_propagates(mock_ollama_client):
         get_models_with_aliases()
 
 
+def _registered_chat_models():
+    return [
+        m for m in get_models_with_aliases() if isinstance(m.model, OllamaChatModel)
+    ]
+
+
 def _registered_chat_model_ids():
-    return {
-        m.model.model_id
-        for m in get_models_with_aliases()
-        if isinstance(m.model, OllamaChatModel)
-    }
+    return {m.model.model_id for m in _registered_chat_models()}
 
 
 @pytest.mark.parametrize(
@@ -99,6 +103,7 @@ def test_model_whose_capabilities_cannot_be_read_is_skipped(mock_ollama_client, 
     make_show_fail(mock_ollama_client, "phi3:latest", error)
     assert _registered_chat_model_ids() == {
         "ollama/deepseek-r1:70b-llama-distill-q4_K_M",
+        "ollama/gemma4:e2b",
         "ollama/llama2:7b-q4_K_M",
         "ollama/stable-code:3b",
     }
@@ -131,3 +136,12 @@ def test_failed_capabilities_read_is_not_cached(mock_ollama_client):
     assert "ollama/phi3:latest" not in _registered_chat_model_ids()
     mock_ollama_client.show.side_effect = show
     assert "ollama/phi3:latest" in _registered_chat_model_ids()
+
+
+def test_registered_models_support_tools_as_reported(mock_ollama_client):
+    registered = _registered_chat_models()
+    assert registered
+    for model in registered:
+        expected = model.model.model_id == "ollama/gemma4:e2b"
+        assert model.model.supports_tools is expected
+        assert model.async_model.supports_tools is expected
