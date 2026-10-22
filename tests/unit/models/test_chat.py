@@ -528,6 +528,18 @@ def test_build_messages_handles_multi_attachment_history(mock_ollama_client, box
             ["completion", "vision"],
             {"image/png", "image/jpeg", "image/webp", "image/gif"},
         ),
+        (["completion", "audio"], {"audio/wav", "audio/mpeg"}),
+        (
+            ["completion", "vision", "audio"],
+            {
+                "image/png",
+                "image/jpeg",
+                "image/webp",
+                "image/gif",
+                "audio/wav",
+                "audio/mpeg",
+            },
+        ),
     ],
 )
 def test_attachment_types_follow_capabilities(
@@ -535,7 +547,7 @@ def test_attachment_types_follow_capabilities(
     capabilities,
     attachment_types,
 ):
-    """Only models that report vision accept images."""
+    """A model accepts images only if it reports vision, and audio only if it reports audio."""
     model = model_class(
         model_id="dummy", ollama_name="dummy", capabilities=capabilities
     )
@@ -573,6 +585,29 @@ async def test_async_image_is_rejected_without_vision(
         )
 
     client.chat.assert_not_called()
+
+
+def test_audio_is_sent_in_images(mock_ollama_client):
+    """Audio travels in the ``images`` field, the only media field Ollama has."""
+    _install_sync_chat(
+        mock_ollama_client,
+        response=_ollama_chunk("ok", done=True, usage=True),
+    )
+    audio = Attachment(content=b"RIFF\x00\x00\x00\x00WAVE", type="audio/wav")
+
+    get_model("ollama/gemma4:e2b").prompt(
+        "Dummy Prompt",
+        stream=False,
+        attachments=[audio],
+    ).text()
+
+    assert mock_ollama_client.chat.call_args.kwargs["messages"] == [
+        {
+            "role": "user",
+            "content": "Dummy Prompt",
+            "images": [audio.base64_content()],
+        },
+    ]
 
 
 def test_build_messages_drops_reasoning_from_history(mock_ollama_client):
