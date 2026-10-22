@@ -24,11 +24,7 @@ def register_models(register: Callable[..., None]) -> None:
 
     Models whose capabilities cannot be read are left out.
     """
-    for digest, name, alias_names in _distinct_models():
-        try:
-            capabilities = get_ollama_model_capabilities(digest, name)
-        except CapabilityReadError:
-            continue
+    for name, alias_names, capabilities in _distinct_models():
         if "completion" not in capabilities:
             continue
         model_id = _to_model_id(name)
@@ -45,8 +41,13 @@ def register_models(register: Callable[..., None]) -> None:
 
 @llm.hookimpl
 def register_embedding_models(register: Callable[..., None]) -> None:
-    """Register an embedding model for each distinct Ollama model."""
-    for _, name, alias_names in _distinct_models():
+    """Register an embedding model for each Ollama model that supports embedding.
+
+    Models whose capabilities cannot be read are left out.
+    """
+    for name, alias_names, capabilities in _distinct_models():
+        if "embedding" not in capabilities:
+            continue
         register(
             OllamaEmbeddingModel(model_id=_to_model_id(name), ollama_name=name),
             aliases=[_to_model_id(alias_name) for alias_name in alias_names],
@@ -58,11 +59,12 @@ def _to_model_id(name: str) -> str:
     return f"ollama/{name}"
 
 
-def _distinct_models() -> Iterator[tuple[str, str, tuple[str, ...]]]:
-    """Yield the digest, primary name and alias names of each model on the Ollama server.
+def _distinct_models() -> Iterator[tuple[str, tuple[str, ...], list[str]]]:
+    """Yield the primary name, alias names and capabilities of each model on the server.
 
     Names that share a digest are one model, and a name tagged ``:latest`` also has
-    its bare form as an alias name.
+    its bare form as an alias name. Models whose capabilities cannot be read are left
+    out.
     """
     names_by_digest = defaultdict(list)
     for model in get_ollama_models():
@@ -72,7 +74,11 @@ def _distinct_models() -> Iterator[tuple[str, str, tuple[str, ...]]]:
             names_by_digest[digest].append(name.removesuffix(":latest"))
     for digest, names in names_by_digest.items():
         name, alias_names = _pick_primary_name(names)
-        yield digest, name, alias_names
+        try:
+            capabilities = get_ollama_model_capabilities(digest, name)
+        except CapabilityReadError:
+            continue
+        yield name, alias_names, capabilities
 
 
 def _pick_primary_name(names: list[str]) -> tuple[str, tuple[str, ...]]:
