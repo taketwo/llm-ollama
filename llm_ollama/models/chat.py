@@ -1,7 +1,7 @@
 """Chat models served by Ollama."""
 
 import json
-from collections.abc import AsyncGenerator, Iterator
+from collections.abc import AsyncGenerator, Collection, Iterator
 from typing import ClassVar, cast
 
 import llm
@@ -28,7 +28,6 @@ class ChatMixin(BaseMixin):
 
     can_stream: bool = True
     supports_schema: bool = True
-    supports_tools: bool = True
     attachment_types: ClassVar[set[str]] = {
         "image/png",
         "image/jpeg",
@@ -96,15 +95,16 @@ class ChatMixin(BaseMixin):
         *,
         model_id: str,
         ollama_name: str,
-        supports_tools: bool = True,
+        capabilities: Collection[str],
     ) -> None:
         """Create the model llm knows as ``model_id`` and Ollama as ``ollama_name``.
 
-        ``supports_tools`` says whether the model accepts tool definitions.
+        ``capabilities`` holds the capability names Ollama reports for the model, such
+        as ``tools``; the model's llm attributes derive from them.
         """
         self.model_id = model_id
         self.ollama_name = ollama_name
-        self.supports_tools = supports_tools
+        self.supports_tools = "tools" in capabilities
 
     def build_messages(
         self,

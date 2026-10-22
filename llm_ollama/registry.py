@@ -31,14 +31,13 @@ def register_models(register: Callable[..., None]) -> None:
             continue
         if "completion" not in capabilities:
             continue
-        supports_tools = "tools" in capabilities
         model_id = _to_model_id(name)
         register(
             OllamaChatModel(
-                model_id=model_id, ollama_name=name, supports_tools=supports_tools
+                model_id=model_id, ollama_name=name, capabilities=capabilities
             ),
             AsyncOllamaChatModel(
-                model_id=model_id, ollama_name=name, supports_tools=supports_tools
+                model_id=model_id, ollama_name=name, capabilities=capabilities
             ),
             aliases=[_to_model_id(alias_name) for alias_name in alias_names],
         )
