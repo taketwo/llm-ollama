@@ -5,6 +5,10 @@ from llm import Attachment, get_model, schema_dsl
 
 pytestmark = pytest.mark.vision
 
+# Every prompt turns thinking off, because gemma4 ignores media while it thinks, which
+# it does by default, and sets temperature 0, so that the answer does not vary between
+# runs
+
 
 def test_attachments(model_id, box_png):
     """Test attachment handling in conversations."""
@@ -16,6 +20,7 @@ def test_attachments(model_id, box_png):
 Task: Warn about missing images/history. Keep replies short. Images are english text.""",
         attachments=[Attachment(content=box_png, type="image/png")],
         schema=schema_dsl("text"),
+        temperature=0,
         think=False,
     )
     response_text = response.text()
@@ -38,6 +43,7 @@ def test_conversation_attachments(model_id, box_png):
             system="""Role: Test assistant for conversation history.
 Task: Warn about missing images/history. Keep replies short. Images are one basic color.""",
             attachments=[Attachment(content=box_png, type="image/png")],
+            temperature=0,
             think=False,
         )
         .text()
@@ -48,6 +54,7 @@ Task: Warn about missing images/history. Keep replies short. Images are one basi
     response = convo.prompt(
         "Based on the history, what word is written in the image?",
         schema=schema_dsl("text"),
+        temperature=0,
         think=False,
     )
     response_text = response.text()
