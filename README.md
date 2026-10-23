@@ -311,7 +311,7 @@ The tests of each kind will be:
 - Force-enabled with `--<kind>` (but fail if they cannot be enabled);
 - Force-disabled with `--no-<kind>`.
 
-To test with another model, pass `--<kind>-model`, for example `--thinking-model qwen3:14b`.
+To test with another model, pass `--<kind>-model`, for example `--thinking-model qwen3:14b`. The thinking model must be able to turn thinking off: `gpt-oss` reasons even with `think` set to false, so it fails the thinking tests.
 
 Unit tests mirror the package one to one: the tests for `llm_ollama/models/chat.py` are in `tests/unit/models/test_chat.py`. Integration tests go through `llm.get_model()` and exercise several modules at once, so each is named after its kind instead: `test_<kind>.py`. Each integration file marks its kind once with `pytestmark` and gets the model ID from the `model_id` fixture. To add a kind, add a row to `MODEL_KINDS` in `tests/conftest.py`, which generates its marker and options.
 
