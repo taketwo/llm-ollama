@@ -22,7 +22,9 @@ class ModelKind:
 
 
 MODEL_KINDS = (
-    ModelKind("chat", "gemma4:e2b", ("completion", "tools", "thinking")),
+    ModelKind("completion", "gemma4:e2b", ("completion",)),
+    ModelKind("tools", "gemma4:e2b", ("completion", "tools")),
+    ModelKind("thinking", "gemma4:e2b", ("completion", "thinking")),
     ModelKind("vision", "gemma4:e2b", ("completion", "vision")),
 )
 
@@ -53,7 +55,8 @@ def pytest_configure(config: pytest.Config) -> None:
     for kind in MODEL_KINDS:
         config.addinivalue_line(
             "markers",
-            f"{kind.name}: needs a {kind.name} model on the Ollama server",
+            f"{kind.name}: needs a model that supports "
+            f"{', '.join(kind.capabilities)} on the Ollama server",
         )
         if config.getoption(f"--{kind.name}") and config.getoption(f"--no-{kind.name}"):
             raise pytest.UsageError(

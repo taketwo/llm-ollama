@@ -294,12 +294,16 @@ To run automated unit and integration tests:
 python -m pytest
 ```
 
-Unit tests live in `tests/unit` and mock the Ollama server. Integration tests live in `tests/integration` and need a running Ollama server. They are grouped by the kind of model they need:
+Unit tests live in `tests/unit` and mock the Ollama server. Integration tests live in `tests/integration` and need a running Ollama server. They are grouped into kinds, one per model capability they test, named as Ollama reports it:
 
-| Kind     | Default model   | Model must support          |
-|----------|-----------------|-----------------------------|
-| `chat`   | `gemma4:e2b`    | completion, tools, thinking |
-| `vision` | `gemma4:e2b`    | completion, vision          |
+| Kind         | Default model | Model must support   |
+|--------------|---------------|----------------------|
+| `completion` | `gemma4:e2b`  | completion           |
+| `tools`      | `gemma4:e2b`  | completion, tools    |
+| `thinking`   | `gemma4:e2b`  | completion, thinking |
+| `vision`     | `gemma4:e2b`  | completion, vision   |
+
+In Ollama's terms, `completion` means the model generates text; it covers the chat API, which the plugin uses.
 
 The tests of each kind will be:
 - Enabled automatically if the Ollama server has the model and the model reports the capabilities it must support;
@@ -307,9 +311,9 @@ The tests of each kind will be:
 - Force-enabled with `--<kind>` (but fail if they cannot be enabled);
 - Force-disabled with `--no-<kind>`.
 
-To test with another model, pass `--<kind>-model`, for example `--chat-model qwen3:14b`.
+To test with another model, pass `--<kind>-model`, for example `--thinking-model qwen3:14b`.
 
-Unit tests mirror the package one to one: the tests for `llm_ollama/models/chat.py` are in `tests/unit/models/test_chat.py`. Integration tests go through `llm.get_model()` and exercise several modules at once, so they are named by the kind of model they need instead. Each integration file marks its kind once with `pytestmark` and gets the model ID from the `model_id` fixture. To add a kind, add a row to `MODEL_KINDS` in `tests/conftest.py`, which generates its marker and options.
+Unit tests mirror the package one to one: the tests for `llm_ollama/models/chat.py` are in `tests/unit/models/test_chat.py`. Integration tests go through `llm.get_model()` and exercise several modules at once, so each is named after its kind instead: `test_<kind>.py`. Each integration file marks its kind once with `pytestmark` and gets the model ID from the `model_id` fixture. To add a kind, add a row to `MODEL_KINDS` in `tests/conftest.py`, which generates its marker and options.
 
 To lint and format the code:
 
