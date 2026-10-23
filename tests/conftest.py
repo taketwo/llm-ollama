@@ -26,7 +26,10 @@ MODEL_KINDS = (
     ModelKind("tools", "gemma4:e2b", ("completion", "tools")),
     ModelKind("thinking", "gemma4:e2b", ("completion", "thinking")),
     ModelKind("vision", "gemma4:e2b", ("completion", "vision")),
+    ModelKind("audio", "gemma4:e2b", ("completion", "audio")),
 )
+
+DATA_DIR = Path(__file__).parent / "data"
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -162,4 +165,20 @@ def model_id(request: pytest.FixtureRequest) -> str:
 @pytest.fixture
 def box_png() -> bytes:
     """A PNG image of the word "shark" in black on white."""
-    return (Path(__file__).parent / "data" / "box.png").read_bytes()
+    return (DATA_DIR / "box.png").read_bytes()
+
+
+@pytest.fixture
+def shark_wav() -> bytes:
+    """A WAV recording of a person saying "shark".
+
+    ``LL-Q1860 (eng)-Grendelkhan-shark.wav`` from Lingua Libre, released under CC0:
+    https://commons.wikimedia.org/wiki/File:LL-Q1860_(eng)-Grendelkhan-shark.wav
+    """
+    return (DATA_DIR / "shark.wav").read_bytes()
+
+
+@pytest.fixture
+def shark_mp3() -> bytes:
+    """``shark_wav`` converted to MP3 by ffmpeg."""
+    return (DATA_DIR / "shark.mp3").read_bytes()
