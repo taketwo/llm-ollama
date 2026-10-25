@@ -7,7 +7,7 @@ setup:
     uv sync --extra test --extra lint
 
 # Pin ruff, tombi and ty to their latest releases
-upgrade-checkers: && setup
+upgrade-checkers: && setup fix-format-tombi
     uv remove --optional lint --no-sync ruff tombi ty
     uv add --optional lint --bounds exact --no-sync ruff tombi ty
 
