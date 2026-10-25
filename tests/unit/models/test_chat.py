@@ -1,5 +1,7 @@
+import json
 from unittest.mock import AsyncMock, Mock
 
+import httpx
 import llm
 import ollama
 import pydantic
@@ -493,7 +495,73 @@ def test_tool_call_reply_round_trip(mocker, mock_ollama_client):
     assert assistant_msg["tool_calls"][0].function.name == "multiply"
     assert assistant_msg["tool_calls"][0].function.arguments == {"a": 6, "b": 7}
     tool_msg = second_call_messages[2]
-    assert tool_msg == {"role": "tool", "content": "42", "name": "multiply"}
+    assert tool_msg == {"role": "tool", "content": "42", "tool_name": "multiply"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("asynchronous", [False, True], ids=["sync", "async"])
+@pytest.mark.parametrize("stream", [False, True], ids=["nonstreaming", "streaming"])
+async def test_tool_result_names_reach_ollama(mocker, asynchronous, stream):
+    """Tool result names survive the real SDK's HTTP request serialization."""
+    requests = []
+
+    def handle_request(request):
+        body = json.loads(request.content)
+        requests.append(body)
+        chunk = (
+            _ollama_chunk(
+                tool_calls=[("multiply", {"a": 6, "b": 7}), ("add", {"a": 6, "b": 7})],
+                done=True,
+            )
+            if len(requests) == 1
+            else _ollama_chunk("The answers are 42 and 13", done=True)
+        )
+        if body["stream"]:
+            return httpx.Response(200, content=chunk.model_dump_json() + "\n")
+        return httpx.Response(200, json=chunk.model_dump())
+
+    transport = httpx.MockTransport(handle_request)
+    client_class = ollama.AsyncClient if asynchronous else ollama.Client
+    client = client_class(host="http://localhost:11434", transport=transport)
+    factory = "get_async_client" if asynchronous else "get_client"
+    mocker.patch(f"llm_ollama.models.chat.{factory}", return_value=client)
+    model_class = AsyncOllamaChatModel if asynchronous else OllamaChatModel
+    model = model_class(
+        model_id="ollama/test", ollama_name="test", capabilities=["completion", "tools"]
+    )
+
+    try:
+        first = model.prompt("Multiply and add 6 and 7", stream=stream)
+        if asynchronous:
+            await first.text()
+            calls = await first.tool_calls()
+        else:
+            first.text()
+            calls = first.tool_calls()
+
+        results = [
+            ToolResult(name=call.name, output=output, tool_call_id=call.tool_call_id)
+            for call, output in zip(calls, ["42", "13"], strict=True)
+        ]
+        if asynchronous:
+            second = await first.reply(tool_results=results, stream=stream)
+            assert await second.text() == "The answers are 42 and 13"
+        else:
+            second = first.reply(tool_results=results, stream=stream)
+            assert second.text() == "The answers are 42 and 13"
+    finally:
+        if asynchronous:
+            await client._client.aclose()
+        else:
+            client._client.close()
+
+    assert len(requests) == 2
+    assert [
+        message for message in requests[1]["messages"] if message["role"] == "tool"
+    ] == [
+        {"role": "tool", "content": "42", "tool_name": "multiply"},
+        {"role": "tool", "content": "13", "tool_name": "add"},
+    ]
 
 
 def test_build_messages_handles_multi_attachment_history(mock_ollama_client, box_png):
