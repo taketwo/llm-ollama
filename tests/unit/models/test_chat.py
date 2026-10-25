@@ -493,7 +493,11 @@ def test_tool_call_reply_round_trip(mocker, mock_ollama_client):
     assert assistant_msg["tool_calls"][0].function.name == "multiply"
     assert assistant_msg["tool_calls"][0].function.arguments == {"a": 6, "b": 7}
     tool_msg = second_call_messages[2]
-    assert tool_msg == {"role": "tool", "content": "42", "name": "multiply"}
+    assert tool_msg == {"role": "tool", "content": "42", "tool_name": "multiply"}
+    # The mocked client accepts any key, but the real SDK silently drops keys
+    # that are not ollama.Message fields.
+    for msg in second_call_messages:
+        assert set(msg) <= set(ollama.Message.model_fields)
 
 
 def test_build_messages_handles_multi_attachment_history(mock_ollama_client, box_png):

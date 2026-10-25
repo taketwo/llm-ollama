@@ -394,7 +394,7 @@ def _convert_message(message: Message) -> list[dict]:
         {
             "role": "tool",
             "content": tool_result.output,
-            "name": tool_result.name,
+            "tool_name": tool_result.name,
         }
         for tool_result in tool_results
     ]
