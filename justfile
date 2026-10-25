@@ -6,10 +6,10 @@ default:
 setup:
     uv sync --extra test --extra lint
 
-# Pin ruff and ty to their latest releases
+# Pin ruff, tombi and ty to their latest releases
 upgrade-checkers: && setup
-    uv remove --optional lint --no-sync ruff ty
-    uv add --optional lint --bounds exact --no-sync ruff ty
+    uv remove --optional lint --no-sync ruff tombi ty
+    uv add --optional lint --bounds exact --no-sync ruff tombi ty
 
 # Run all checks
 check: check-format check-lint check-type
@@ -18,9 +18,16 @@ check: check-format check-lint check-type
 check-type:
     .venv/bin/ty check llm_ollama
 
-# Verify code formatting
-check-format:
+# Verify formatting
+check-format: check-format-ruff check-format-tombi
+
+# Verify Python formatting
+check-format-ruff:
     .venv/bin/ruff format --check .
+
+# Verify pyproject.toml formatting
+check-format-tombi:
+    .venv/bin/tombi format --check pyproject.toml
 
 # Run linting checks
 check-lint:
@@ -30,8 +37,15 @@ check-lint:
 fix: fix-lint fix-format
 
 # Auto-format code
-fix-format:
+fix-format: fix-format-ruff fix-format-tombi
+
+# Auto-format Python code
+fix-format-ruff:
     .venv/bin/ruff format .
+
+# Auto-format pyproject.toml
+fix-format-tombi:
+    .venv/bin/tombi format pyproject.toml
 
 # Auto-fix linting issues
 fix-lint:

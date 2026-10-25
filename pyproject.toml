@@ -20,6 +20,7 @@ ollama = "llm_ollama"
 [project.optional-dependencies]
 lint = [
   "ruff==0.17.1",
+  "tombi==1.9.5",
   "ty==0.0.89",
 ]
 test = ["pytest", "pytest-asyncio", "pytest-cov", "pytest-mock"]
@@ -74,3 +75,6 @@ lint.per-file-ignores."tests/**" = [
 
 [tool.setuptools.packages.find]
 include = ["llm_ollama*"]
+
+[tool.tombi.format.rules]
+trailing-comment-alignment = true
