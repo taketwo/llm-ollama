@@ -88,6 +88,18 @@ def mock_ollama_client(mocker):
                 "model_info": {},
                 "capabilities": ["completion", "vision", "audio", "tools", "thinking"],
             },
+            {
+                "model": "tev1:0.8b",
+                "digest": "ce1c091893a677d43b100849c20b374072d760bd15ded9a04aaf7241481c0085",
+                "model_info": {},
+                "capabilities": ["decision"],
+            },
+            {
+                "model": "clef-flash:latest",
+                "digest": "f27a395643daeb3d164c94b42b9ffdf3201684f0769b0e7b7bdb1ad332ea5ce9",
+                "model_info": {},
+                "capabilities": ["decision", "vision"],
+            },
         ],
     }
     client = mocker.patch("ollama.Client").return_value
