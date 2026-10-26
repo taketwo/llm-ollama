@@ -9,6 +9,7 @@ import ollama
 from llm_ollama.auth import get_client
 from llm_ollama.cache import Cache
 from llm_ollama.models.chat import AsyncOllamaChatModel, OllamaChatModel
+from llm_ollama.models.decision import AsyncOllamaDecisionModel, OllamaDecisionModel
 from llm_ollama.models.embed import OllamaEmbeddingModel
 
 cache = Cache(llm.user_dir() / "llm-ollama" / "cache")
@@ -20,22 +21,32 @@ class CapabilityReadError(Exception):
 
 @llm.hookimpl
 def register_models(register: Callable[..., None]) -> None:
-    """Register a chat model for each Ollama model that supports completion.
+    """Register a chat or decision model for each Ollama model that supports one.
 
-    Models whose capabilities cannot be read are left out.
+    A model that supports completion is registered as a chat model, and any other
+    model that supports decision as a decision model. Models whose capabilities
+    cannot be read are left out.
     """
     for name, alias_names, capabilities in _distinct_models():
-        if "completion" not in capabilities:
-            continue
         model_id = _to_model_id(name)
+        if "completion" in capabilities:
+            models = (
+                OllamaChatModel(
+                    model_id=model_id, ollama_name=name, capabilities=capabilities
+                ),
+                AsyncOllamaChatModel(
+                    model_id=model_id, ollama_name=name, capabilities=capabilities
+                ),
+            )
+        elif "decision" in capabilities:
+            models = (
+                OllamaDecisionModel(model_id=model_id, ollama_name=name),
+                AsyncOllamaDecisionModel(model_id=model_id, ollama_name=name),
+            )
+        else:
+            continue
         register(
-            OllamaChatModel(
-                model_id=model_id, ollama_name=name, capabilities=capabilities
-            ),
-            AsyncOllamaChatModel(
-                model_id=model_id, ollama_name=name, capabilities=capabilities
-            ),
-            aliases=[_to_model_id(alias_name) for alias_name in alias_names],
+            *models, aliases=[_to_model_id(alias_name) for alias_name in alias_names]
         )
 
 

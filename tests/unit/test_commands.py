@@ -11,6 +11,7 @@ def test_models_prints_every_name_with_digest_and_capabilities(mock_ollama_clien
     assert result.exit_code == 0, result.output
     assert [line.rstrip() for line in result.output.splitlines()] == [
         "model                                   digest          capabilities",
+        "clef-flash:latest                       f27a395643da    decision, vision",
         "deepseek-r1:70b                         0c1615a8ca32    completion, thinking",
         "deepseek-r1:70b-llama-distill-q4_K_M    0c1615a8ca32    completion, thinking",
         "gemma4:e2b                              b37049369adf    audio, completion, thinking, tools, vision",
@@ -20,6 +21,7 @@ def test_models_prints_every_name_with_digest_and_capabilities(mock_ollama_clien
         "mxbai-embed-large:latest                468836162de7    embedding",
         "phi3:latest                             e2fd6321a5fe    completion",
         "stable-code:3b                          aa5ab8afb862    completion",
+        "tev1:0.8b                               ce1c091893a6    decision",
     ]
 
 
@@ -36,6 +38,7 @@ def test_models_lists_models_whose_capabilities_cannot_be_read_apart(
     assert result.exit_code == 0, result.output
     assert [line.rstrip() for line in result.stdout.splitlines()] == [
         "model                                   digest          capabilities",
+        "clef-flash:latest                       f27a395643da    decision, vision",
         "deepseek-r1:70b                         0c1615a8ca32    completion, thinking",
         "deepseek-r1:70b-llama-distill-q4_K_M    0c1615a8ca32    completion, thinking",
         "gemma4:e2b                              b37049369adf    audio, completion, thinking, tools, vision",
@@ -44,6 +47,7 @@ def test_models_lists_models_whose_capabilities_cannot_be_read_apart(
         "llama2:latest                           78e26419b446    completion",
         "mxbai-embed-large:latest                468836162de7    embedding",
         "stable-code:3b                          aa5ab8afb862    completion",
+        "tev1:0.8b                               ce1c091893a6    decision",
     ]
     assert result.stderr.splitlines() == [
         "",

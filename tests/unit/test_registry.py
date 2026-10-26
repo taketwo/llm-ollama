@@ -7,7 +7,8 @@ from httpx import ConnectError
 from llm import get_embedding_models_with_aliases, get_models_with_aliases
 from llm.plugins import load_plugins, pm
 
-from llm_ollama.models.chat import OllamaChatModel
+from llm_ollama.models.chat import AsyncOllamaChatModel, OllamaChatModel
+from llm_ollama.models.decision import AsyncOllamaDecisionModel, OllamaDecisionModel
 from llm_ollama.models.embed import OllamaEmbeddingModel
 from llm_ollama.registry import CapabilityReadError, get_ollama_model_capabilities
 
@@ -18,19 +19,43 @@ def test_plugin_is_installed():
     assert "llm_ollama" in names
 
 
-def test_registered_chat_models(mock_ollama_client):
-    expected = (
-        ("ollama/deepseek-r1:70b-llama-distill-q4_K_M", ["ollama/deepseek-r1:70b"]),
-        ("ollama/gemma4:e2b", []),
-        (
-            "ollama/llama2:7b-q4_K_M",
-            ["ollama/llama2:7b", "ollama/llama2:latest", "ollama/llama2"],
+@pytest.mark.parametrize(
+    ("model_class", "async_model_class", "expected"),
+    [
+        pytest.param(
+            OllamaChatModel,
+            AsyncOllamaChatModel,
+            (
+                (
+                    "ollama/deepseek-r1:70b-llama-distill-q4_K_M",
+                    ["ollama/deepseek-r1:70b"],
+                ),
+                ("ollama/gemma4:e2b", []),
+                (
+                    "ollama/llama2:7b-q4_K_M",
+                    ["ollama/llama2:7b", "ollama/llama2:latest", "ollama/llama2"],
+                ),
+                ("ollama/phi3:latest", ["ollama/phi3"]),
+                ("ollama/stable-code:3b", []),
+            ),
+            id="chat",
         ),
-        ("ollama/phi3:latest", ["ollama/phi3"]),
-        ("ollama/stable-code:3b", []),
-    )
+        pytest.param(
+            OllamaDecisionModel,
+            AsyncOllamaDecisionModel,
+            (
+                ("ollama/clef-flash:latest", ["ollama/clef-flash"]),
+                ("ollama/tev1:0.8b", []),
+            ),
+            id="decision",
+        ),
+    ],
+)
+def test_registered_models(
+    mock_ollama_client, model_class, async_model_class, expected
+):
     registered_ollama_models = sorted(
-        [m for m in get_models_with_aliases() if isinstance(m.model, OllamaChatModel)],
+        [m for m in get_models_with_aliases() if isinstance(m.model, model_class)],
         key=lambda m: m.model.model_id,
     )
     assert len(registered_ollama_models) == len(expected)
@@ -38,6 +63,8 @@ def test_registered_chat_models(mock_ollama_client):
         registered_ollama_models, expected, strict=True
     ):
         assert model.model.model_id == model_id
+        assert isinstance(model.async_model, async_model_class)
+        assert model.async_model.model_id == model_id
         assert model.aliases == aliases
 
 
