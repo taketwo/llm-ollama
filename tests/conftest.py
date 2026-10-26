@@ -28,6 +28,7 @@ MODEL_KINDS = (
     ModelKind("vision", "gemma4:e2b", ("completion", "vision")),
     ModelKind("audio", "gemma4:e2b", ("completion", "audio")),
     ModelKind("embedding", "all-minilm", ("embedding",)),
+    ModelKind("decision", "tev1:0.8b", ("decision",)),
 )
 
 DATA_DIR = Path(__file__).parent / "data"
