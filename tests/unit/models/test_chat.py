@@ -1,3 +1,4 @@
+from copy import deepcopy
 from unittest.mock import AsyncMock, Mock
 
 import llm
@@ -320,6 +321,40 @@ def test_tool_conversion_kwargs_uses_input_schema():
     assert params.properties["database"].type == "string"
     assert params.properties["display"].enum == ["rows", "csv", "both"]
     assert params.required == ["database", "sql"]
+
+
+def test_tool_conversion_preserves_schema_definitions():
+    schema = {
+        "type": "object",
+        "$defs": {
+            "location": {
+                "type": "object",
+                "properties": {"city": {"type": "string"}},
+                "required": ["city"],
+            },
+        },
+        "properties": {
+            "locations": {"type": "array", "items": {"$ref": "#/$defs/location"}},
+        },
+        "required": ["locations"],
+    }
+    original_schema = deepcopy(schema)
+    tool = llm.Tool(
+        name="weather",
+        input_schema=schema,
+        implementation=lambda **_kwargs: "sunny",
+    )
+
+    ollama_tool = _llm_tool_to_ollama_tool(tool)
+
+    assert (
+        ollama_tool.function.parameters.model_dump(
+            by_alias=True,
+            exclude_none=True,
+        )
+        == original_schema
+    )
+    assert schema == original_schema
 
 
 def test_tool_conversion_without_implementation_raises():
