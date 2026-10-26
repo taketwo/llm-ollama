@@ -304,6 +304,7 @@ Unit tests live in `tests/unit` and mock the Ollama server. Integration tests li
 | `vision`     | `gemma4:e2b`  | completion, vision   |
 | `audio`      | `gemma4:e2b`  | completion, audio    |
 | `embedding`  | `all-minilm`  | embedding            |
+| `decision`   | `tev1:0.8b`   | decision             |
 
 In Ollama's terms, `completion` means the model generates text; it covers the chat API, which the plugin uses.
 
