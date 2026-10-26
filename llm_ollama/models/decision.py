@@ -1,12 +1,15 @@
 """Decision models served by Ollama."""
 
 import json
+from collections.abc import AsyncGenerator, Iterator
 from typing import Literal, cast
 
 import llm
+import ollama
 from llm.parts import Message, TextPart
 from pydantic import Field, ValidationInfo, field_validator
 
+from llm_ollama.auth import get_async_client, get_client
 from llm_ollama.models.base import BaseMixin
 
 # The ID of the one question each request asks; the same as llm-typesafe's, so the
@@ -81,9 +84,15 @@ class _DecisionOptions(llm.Options):
 
 
 class DecisionMixin(BaseMixin):
-    """Request building shared by the sync and async Ollama decision models."""
+    """Request and result handling shared by the sync and async Ollama decision models."""
 
+    supports_conversation = False
     Options = _DecisionOptions
+
+    def __init__(self, *, model_id: str, ollama_name: str) -> None:
+        """Create the model llm knows as ``model_id`` and Ollama as ``ollama_name``."""
+        self.model_id = model_id
+        self.ollama_name = ollama_name
 
     def _prepare_systemone_kwargs(self, prompt: llm.Prompt) -> dict:
         """Build the arguments of an Ollama ``systemone`` call, other than the model.
@@ -114,6 +123,65 @@ class DecisionMixin(BaseMixin):
         if options.criteria is not None:
             question["criteria"] = options.criteria
         return {"state": state, "questions": {_QUESTION_ID: question}}
+
+    def _record_result(
+        self,
+        response: llm.Response | llm.AsyncResponse,
+        result: ollama.SystemOneResponse,
+    ) -> str:
+        """Store the ``systemone`` result and token usage on ``response``.
+
+        Returns the answer to the question as JSON text.
+        """
+        response.response_json = result.model_dump()
+        response.set_usage(
+            input=result.usage.input_tokens,
+            output=result.usage.output_tokens,
+        )
+        answer = result.answers[_QUESTION_ID]
+        return json.dumps(answer.model_dump(), ensure_ascii=False)
+
+
+class OllamaDecisionModel(DecisionMixin, llm.KeyModel):
+    """A decision model served by Ollama."""
+
+    def execute(
+        self,
+        prompt: llm.Prompt,
+        stream: bool,  # noqa: FBT001
+        response: llm.Response,
+        conversation: llm.Conversation | None = None,
+        key: str | None = None,
+    ) -> Iterator[str]:
+        """Put the prompt's question to the Ollama server, yielding the answer as JSON text."""
+        # Unused: the model cannot stream, and llm rejects history before execute.
+        del stream, conversation
+
+        kwargs = self._prepare_systemone_kwargs(prompt)
+        result = get_client(key=key).systemone(model=self.ollama_name, **kwargs)
+        yield self._record_result(response, result)
+
+
+class AsyncOllamaDecisionModel(DecisionMixin, llm.AsyncKeyModel):
+    """An asynchronous decision model served by Ollama."""
+
+    async def execute(
+        self,
+        prompt: llm.Prompt,
+        stream: bool,  # noqa: FBT001
+        response: llm.AsyncResponse,
+        conversation: llm.AsyncConversation | None = None,
+        key: str | None = None,
+    ) -> AsyncGenerator[str, None]:
+        """Put the prompt's question to the Ollama server, yielding the answer as JSON text."""
+        # Unused: the model cannot stream, and llm rejects history before execute.
+        del stream, conversation
+
+        kwargs = self._prepare_systemone_kwargs(prompt)
+        result = await get_async_client(key=key).systemone(
+            model=self.ollama_name, **kwargs
+        )
+        yield self._record_result(response, result)
 
 
 def _join_text(messages: list[Message], role: str) -> str:
