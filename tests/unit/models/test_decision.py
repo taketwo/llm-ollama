@@ -1,15 +1,24 @@
+import inspect
 import json
+from dataclasses import dataclass
+from unittest.mock import AsyncMock, Mock
 
 import llm
+import ollama
 import pydantic
 import pytest
+from helpers import assert_bearer_token
 from llm.parts import Message, TextPart
 
-from llm_ollama.models.decision import DecisionMixin
+from llm_ollama.models.decision import (
+    AsyncOllamaDecisionModel,
+    DecisionMixin,
+    OllamaDecisionModel,
+)
 
 QUESTION = "Is this a person's name?"
 
-_MODEL = DecisionMixin()
+_MODEL = OllamaDecisionModel(model_id="ollama/tev1:0.8b", ollama_name="tev1:0.8b")
 
 
 def _prepare_kwargs(state="Alice", system=QUESTION, **options):
@@ -187,3 +196,137 @@ def test_missing_question_is_rejected(system):
 
 def test_empty_state_is_passed_through():
     assert _prepare_kwargs(state="")["state"] == ""
+
+
+def _build_result(answer=None, *, input_tokens=115, output_tokens=0):
+    """Build the ``systemone`` result of a model that gave ``answer`` to the one question."""
+    return ollama.SystemOneResponse.model_validate(
+        {
+            "model": "tev1:0.8b",
+            "answers": {"evaluation": answer or {"type": "noul", "noul": 0.86}},
+            "usage": {"input_tokens": input_tokens, "output_tokens": output_tokens},
+        }
+    )
+
+
+async def _resolve(value):
+    """Await ``value`` if it is awaitable (an async response), so one test serves both."""
+    return await value if inspect.isawaitable(value) else value
+
+
+@dataclass
+class _MockedDecision:
+    """A decision model whose Ollama client is a mock."""
+
+    model: OllamaDecisionModel | AsyncOllamaDecisionModel
+    client: Mock
+    # The patched ollama.Client or ollama.AsyncClient, which returns client
+    client_class: Mock
+
+
+@pytest.fixture(
+    params=[OllamaDecisionModel, AsyncOllamaDecisionModel], ids=["sync", "async"]
+)
+def decision(request, mocker):
+    """Provide a sync and an async decision model whose client answers ``noul``."""
+    is_async = request.param is AsyncOllamaDecisionModel
+    client = AsyncMock() if is_async else Mock()
+    client.systemone.return_value = _build_result()
+    client_class = mocker.patch(
+        "ollama.AsyncClient" if is_async else "ollama.Client", return_value=client
+    )
+    model = request.param(model_id="ollama/tev1:0.8b", ollama_name="tev1:0.8b")
+    return _MockedDecision(model=model, client=client, client_class=client_class)
+
+
+@pytest.mark.asyncio
+async def test_request_goes_to_the_server_by_ollama_name(decision):
+    response = decision.model.prompt("Alice", system=QUESTION)
+
+    await _resolve(response.text())
+
+    decision.client.systemone.assert_called_once_with(
+        model="tev1:0.8b",
+        state="Alice",
+        questions={"evaluation": {"type": "noul", "instructions": QUESTION}},
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("answer", "expected"),
+    [
+        (
+            {"type": "noul", "noul": 0.86},
+            '{"type": "noul", "noul": 0.86}',
+        ),
+        (
+            {
+                "type": "choice",
+                "choice": "имя",
+                "probabilities": {"имя": 0.75, "место": 0.25},
+                "confidence": 0.5,
+            },
+            '{"type": "choice", "choice": "имя", "probabilities": {"имя": 0.75, "место": 0.25}, "confidence": 0.5}',
+        ),
+    ],
+)
+async def test_answer_is_yielded_as_json_text(decision, answer, expected):
+    decision.client.systemone.return_value = _build_result(answer)
+    response = decision.model.prompt("Alice", system=QUESTION)
+
+    assert await _resolve(response.text()) == expected
+
+
+@pytest.mark.asyncio
+async def test_usage_reports_input_and_output_tokens(decision):
+    decision.client.systemone.return_value = _build_result(
+        input_tokens=115, output_tokens=7
+    )
+    response = decision.model.prompt("Alice", system=QUESTION)
+
+    usage = await _resolve(response.usage())
+
+    assert (usage.input, usage.output) == (115, 7)
+
+
+@pytest.mark.asyncio
+async def test_full_result_is_stored_as_response_json(decision):
+    response = decision.model.prompt("Alice", system=QUESTION)
+
+    await _resolve(response.text())
+
+    assert response.response_json == {
+        "model": "tev1:0.8b",
+        "answers": {"evaluation": {"type": "noul", "noul": 0.86}},
+        "usage": {"input_tokens": 115, "output_tokens": 0},
+    }
+
+
+@pytest.mark.asyncio
+async def test_key_reaches_client_as_bearer_token(decision):
+    response = decision.model.prompt("Alice", system=QUESTION, key="caller-key")
+
+    await _resolve(response.text())
+
+    assert_bearer_token(decision.client_class, "caller-key")
+
+
+@pytest.mark.asyncio
+async def test_server_error_propagates(decision):
+    decision.client.systemone.side_effect = ollama.ResponseError(
+        "state must not be empty", 400
+    )
+    response = decision.model.prompt("", system=QUESTION)
+
+    with pytest.raises(ollama.ResponseError, match="state must not be empty"):
+        await _resolve(response.text())
+
+
+@pytest.mark.asyncio
+async def test_conversation_cannot_continue(decision):
+    conversation = decision.model.conversation()
+    await _resolve(conversation.prompt("Alice", system=QUESTION).text())
+
+    with pytest.raises(llm.ConversationNotSupported):
+        conversation.prompt("Bob", system=QUESTION)
