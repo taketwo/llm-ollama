@@ -439,18 +439,9 @@ def _llm_tool_to_ollama_tool(tool: llm.Tool) -> ollama.Tool:
     if tool.description:
         ollama_tool.function.description = tool.description
     if tool.input_schema:
-        ollama_tool.function.parameters = ollama.Tool.Function.Parameters(
-            type=tool.input_schema.get("type"),
-            required=tool.input_schema.get("required"),
-            properties={
-                k: ollama.Tool.Function.Parameters.Property(
-                    **{
-                        f: v
-                        for f, v in p.items()
-                        if f in ("type", "description", "enum", "items")
-                    },
-                )
-                for k, p in tool.input_schema.get("properties", {}).items()
-            },
+        ollama_tool.function.parameters = (
+            ollama.Tool.Function.Parameters.model_validate(
+                tool.input_schema,
+            )
         )
     return ollama_tool
