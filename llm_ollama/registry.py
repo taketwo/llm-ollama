@@ -3,6 +3,7 @@
 from collections import defaultdict
 from collections.abc import Callable, Iterator
 
+import httpx
 import llm
 import ollama
 
@@ -140,5 +141,5 @@ def get_ollama_model_capabilities(
     """
     try:
         return get_client().show(name).capabilities or []
-    except (ollama.ResponseError, ConnectionError) as e:
+    except (ollama.ResponseError, ConnectionError, httpx.RequestError) as e:
         raise CapabilityReadError(str(e)) from e

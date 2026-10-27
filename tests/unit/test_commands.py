@@ -1,6 +1,8 @@
 import ollama
+import pytest
 from click.testing import CliRunner
 from helpers import make_show_fail
+from httpx import ConnectTimeout, RemoteProtocolError
 from llm.cli import cli
 
 
@@ -23,13 +25,27 @@ def test_models_prints_every_name_with_digest_and_capabilities(mock_ollama_clien
     ]
 
 
+@pytest.mark.parametrize(
+    "error",
+    [
+        ollama.ResponseError("phi3 was retired", 410),
+        ConnectionError("connection refused"),
+        ConnectTimeout("connect timed out"),
+        RemoteProtocolError("server disconnected"),
+    ],
+    ids=[
+        "response-error",
+        "connection-error",
+        "connect-timeout",
+        "remote-protocol-error",
+    ],
+)
 def test_models_lists_models_whose_capabilities_cannot_be_read_apart(
     mock_ollama_client,
+    error,
 ):
     """Such models are left out of the table and listed with their error on stderr."""
-    make_show_fail(
-        mock_ollama_client, "phi3:latest", ollama.ResponseError("phi3 was retired", 410)
-    )
+    make_show_fail(mock_ollama_client, "phi3:latest", error)
 
     result = CliRunner().invoke(cli, ["ollama", "models"])
 
@@ -48,5 +64,5 @@ def test_models_lists_models_whose_capabilities_cannot_be_read_apart(
     assert result.stderr.splitlines() == [
         "",
         "Not registered, because their capabilities could not be read:",
-        "  phi3:latest: phi3 was retired (status code: 410)",
+        f"  phi3:latest: {error}",
     ]
