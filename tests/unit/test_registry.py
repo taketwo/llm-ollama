@@ -1,9 +1,10 @@
+import re
 from unittest.mock import Mock
 
 import ollama
 import pytest
 from helpers import make_show_fail
-from httpx import ConnectError
+from httpx import ConnectError, ConnectTimeout, RemoteProtocolError
 from llm import get_embedding_models_with_aliases, get_models_with_aliases
 from llm.plugins import load_plugins, pm
 
@@ -100,6 +101,15 @@ _HOOKS = [
     ),
 ]
 
+_CAPABILITY_ERRORS = [
+    pytest.param(ollama.ResponseError("model was retired", 410), id="response-error"),
+    pytest.param(ConnectionError("gone"), id="connection-error"),
+    pytest.param(ConnectTimeout("connect timed out"), id="connect-timeout"),
+    pytest.param(
+        RemoteProtocolError("server disconnected"), id="remote-protocol-error"
+    ),
+]
+
 
 @pytest.mark.parametrize(
     ("name", "registered_model_ids", "expected"),
@@ -123,11 +133,7 @@ _HOOKS = [
         ),
     ],
 )
-@pytest.mark.parametrize(
-    "error",
-    [ollama.ResponseError("model was retired", 410), ConnectionError("gone")],
-    ids=["response-error", "connection-error"],
-)
+@pytest.mark.parametrize("error", _CAPABILITY_ERRORS)
 def test_model_whose_capabilities_cannot_be_read_is_skipped(
     mock_ollama_client,
     name,
@@ -139,41 +145,51 @@ def test_model_whose_capabilities_cannot_be_read_is_skipped(
     assert registered_model_ids() == expected
 
 
-def test_capability_read_error_keeps_server_message_and_cause(mock_ollama_client):
-    error = ollama.ResponseError("phi3 was retired", 410)
+@pytest.mark.parametrize("error", _CAPABILITY_ERRORS)
+def test_capability_read_error_keeps_message_and_cause(mock_ollama_client, error):
     make_show_fail(mock_ollama_client, "phi3:latest", error)
     with pytest.raises(
-        CapabilityReadError, match=r"^phi3 was retired \(status code: 410\)$"
+        CapabilityReadError, match=f"^{re.escape(str(error))}$"
     ) as excinfo:
         get_ollama_model_capabilities("e2fd6321a5fe", "phi3:latest")
     assert excinfo.value.__cause__ is error
 
 
 @pytest.mark.parametrize(("name", "registered_model_ids"), _HOOKS)
+@pytest.mark.parametrize("error", _CAPABILITY_ERRORS)
 def test_model_with_cached_capabilities_is_registered_when_show_fails(
     mock_ollama_client,
     name,
     registered_model_ids,
+    error,
 ):
     assert f"ollama/{name}" in registered_model_ids()
-    make_show_fail(
-        mock_ollama_client, name, ollama.ResponseError("model was retired", 410)
-    )
+    make_show_fail(mock_ollama_client, name, error)
     assert f"ollama/{name}" in registered_model_ids()
 
 
 @pytest.mark.parametrize(("name", "registered_model_ids"), _HOOKS)
+@pytest.mark.parametrize("error", _CAPABILITY_ERRORS)
 def test_failed_capabilities_read_is_not_cached(
     mock_ollama_client,
     name,
     registered_model_ids,
+    error,
 ):
-    show = make_show_fail(
-        mock_ollama_client, name, ollama.ResponseError("model was retired", 410)
-    )
+    show = make_show_fail(mock_ollama_client, name, error)
     assert f"ollama/{name}" not in registered_model_ids()
     mock_ollama_client.show.side_effect = show
     assert f"ollama/{name}" in registered_model_ids()
+
+
+@pytest.mark.parametrize(
+    "error", [ValueError("invalid capabilities"), KeyboardInterrupt()]
+)
+def test_unexpected_capability_errors_propagate(mock_ollama_client, error):
+    make_show_fail(mock_ollama_client, "phi3:latest", error)
+    with pytest.raises(type(error)) as excinfo:
+        _registered_chat_model_ids()
+    assert excinfo.value is error
 
 
 def test_registered_models_support_tools_as_reported(mock_ollama_client):
