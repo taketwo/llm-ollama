@@ -41,12 +41,13 @@ class OllamaEmbeddingModel(BaseMixin, llm.EmbeddingModel):
                 )
 
     def embed_batch(
-        self, items: Iterable[str | bytes], *, key: str | None = None
+        self, items: Iterable[str | bytes | llm.Attachment], *, key: str | None = None
     ) -> Iterator[list[float]]:
         """Embed each of ``items`` on the Ollama server, yielding one vector per item."""
         result = get_client(key=key).embed(
             model=self.ollama_name,
-            # supports_binary is False, so llm passes only strings.
+            # supports_binary is False and attachment_types is empty, so llm passes
+            # only strings.
             input=cast("Sequence[str]", items),
             truncate=self.truncate,
         )
