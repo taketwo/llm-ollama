@@ -89,6 +89,16 @@ llm embed -m ollama/mxbai-embed-large -i README.md
 
 By default, the input will be truncated from the end to fit within the context length. This behavior can be changed by setting `OLLAMA_EMBED_TRUNCATE=no` environment variable. In such cases, embedding operation will fail if the context length is exceeded.
 
+### Decision models
+
+[Decision models](https://ollama.com/search?c=decision), such as Tev1 and Clef, answer a question about the input with probabilities instead of text. The question goes in the system prompt, and the answer comes back as JSON:
+
+```bash
+llm -m ollama/tev1:0.8b -s 'Is a refund being requested?' 'I was charged twice. Please refund the extra payment.'
+```
+
+The `answer_type` and `criteria` options switch to multiple-choice or scored questions, and `input_format` sends the prompt as JSON. The options match those of the [llm-typesafe](https://github.com/simonw/llm-typesafe) plugin.
+
 ### Reasoning
 
 Ollama models with [thinking support](https://ollama.com/search?c=thinking) stream their reasoning trace alongside the final answer. The plugin surfaces it as a separate reasoning part on the response so it can be displayed, persisted, and round-tripped through follow-up turns.
@@ -148,17 +158,19 @@ Ollama: ollama/stable-code:3b (aliases: ollama/stable-code:code, ollama/stable-c
 
 ## Model options
 
-All models accept [Ollama modelfile parameters](https://github.com/ollama/ollama/blob/main/docs/modelfile.mdx#parameter) as options. Use the `-o name value` syntax to specify them, for example:
+Chat models accept [Ollama modelfile parameters](https://github.com/ollama/ollama/blob/main/docs/modelfile.mdx#parameter) as options. Use the `-o name value` syntax to specify them, for example:
 
 - `-o temperature 0.8`: set the temperature of the model
 - `-o num_ctx 256000`: set the size of the context window used to generate the next token
 
 See the referenced page for the complete list with descriptions and default values.
 
-Additionally, the -o flag supports plugin-specific options:
+Additionally, chat models support plugin-specific options:
 
 - `-o json_object 1` forces the model to reply with a valid JSON object. Note that your prompt must mention JSON for this to work;
 - `-o think false` disables the intermediate reasoning step for thinking-capable models. See also the [Reasoning](#reasoning) feature section.
+
+`llm models --options` lists the options of every model.
 
 ## Connecting to Ollama server
 
@@ -260,6 +272,7 @@ llm_ollama/
   models/
     base.py       BaseMixin
     chat.py       chat models, conversion of any llm.Tool for a chat request
+    decision.py   decision models
     embed.py      embedding model
 ```
 
@@ -275,6 +288,9 @@ BaseMixin                      base.py; __str__, get_key
 ├─ ChatMixin                   chat.py; options, attachment types, message building
 │  ├─ OllamaChatModel          + llm.KeyModel
 │  └─ AsyncOllamaChatModel     + llm.AsyncKeyModel
+├─ DecisionMixin               decision.py; options, request building, result handling
+│  ├─ OllamaDecisionModel      + llm.KeyModel
+│  └─ AsyncOllamaDecisionModel + llm.AsyncKeyModel
 └─ OllamaEmbeddingModel        embed.py; + llm.EmbeddingModel
 ```
 
