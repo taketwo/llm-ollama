@@ -114,7 +114,7 @@ def _pick_primary_name(names: list[str]) -> tuple[str, tuple[str, ...]]:
     sorted_names = sorted(
         names,
         key=lambda name: (
-            ":" not in name,  # Prefer names with a colon
+            ":" not in name.rsplit("/", 1)[-1],  # Prefer an explicit model tag
             name.endswith(":latest"),  # Non-latest tags preferred over latest
             -len(name),  # Prefer longer names (likely more specific/quantized)
             name,  # Finally sort by name itself
