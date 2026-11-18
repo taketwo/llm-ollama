@@ -10,7 +10,30 @@ from llm.plugins import load_plugins, pm
 from llm_ollama.models.chat import AsyncOllamaChatModel, OllamaChatModel
 from llm_ollama.models.decision import AsyncOllamaDecisionModel, OllamaDecisionModel
 from llm_ollama.models.embed import OllamaEmbeddingModel
-from llm_ollama.registry import CapabilityReadError, get_ollama_model_capabilities
+from llm_ollama.registry import (
+    CapabilityReadError,
+    get_ollama_model_capabilities,
+    register_models,
+)
+
+
+def test_registry_port_does_not_turn_bare_model_name_into_a_tag(mocker):
+    digest = "test-digest"
+    name = "registry.example:5000/team/model:latest"
+    mocker.patch(
+        "llm_ollama.registry.get_ollama_models",
+        return_value=[{"model": name, "digest": digest}],
+    )
+    mocker.patch(
+        "llm_ollama.registry.get_ollama_model_capabilities", return_value=["completion"]
+    )
+    register = Mock()
+    register_models(register)
+    model = register.call_args.args[0]
+    assert model.model_id == f"ollama/{name}"
+    assert register.call_args.kwargs["aliases"] == [
+        "ollama/registry.example:5000/team/model"
+    ]
 
 
 def test_plugin_is_installed():
