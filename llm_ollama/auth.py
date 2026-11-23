@@ -58,7 +58,7 @@ def _parse_auth_from_url(url: str) -> tuple[str, httpx.BasicAuth | None]:
     """
     parsed = urlparse(url)
     auth = None
-    if parsed.username and parsed.password:
+    if parsed.username is not None and parsed.password is not None:
         auth = httpx.BasicAuth(
             username=unquote(parsed.username),
             password=unquote(parsed.password),

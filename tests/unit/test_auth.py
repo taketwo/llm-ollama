@@ -145,6 +145,9 @@ class TestClientCreation:
     ("host_env", "expected_host", "expected_user", "expected_pass"),
     [
         ("http://user:pass@localhost:11434", "http://localhost:11434", "user", "pass"),
+        ("http://user:@localhost:11434", "http://localhost:11434", "user", ""),
+        ("http://:pass@localhost:11434", "http://localhost:11434", "", "pass"),
+        ("http://:@localhost:11434", "http://localhost:11434", "", ""),
         (
             "https://admin:secret@secure.example.com",
             "https://secure.example.com",
